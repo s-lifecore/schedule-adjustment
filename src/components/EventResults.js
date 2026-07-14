@@ -222,6 +222,12 @@ const EventResults = ({ eventId, onBack }) => {
       <div className="event-info">
         <p><strong>候補日:</strong> {event.candidateDates.join(', ')}</p>
         <p><strong>回答数:</strong> {responses.length}件</p>
+        {event.description && (
+          <div className="event-description">
+            <strong>イベント説明:</strong><br />
+            <span>{event.description}</span>
+          </div>
+        )}
         <button onClick={copyEventLink} className="share-btn">
           共有リンクをコピー
         </button>

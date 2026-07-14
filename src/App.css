@@ -8,6 +8,8 @@
   color: #333;
   font-size: 15px;
   text-align: left;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 .App {
   text-align: center;
@@ -658,6 +660,8 @@
   background-color: #f8f9fa;
   border-left: 3px solid #007bff;
   border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .event-actions {

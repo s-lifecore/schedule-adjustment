@@ -15,6 +15,13 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const [endTime, setEndTime] = useState('');
   const [timeSlotInPersonAvailable, setTimeSlotInPersonAvailable] = useState(false);
   const [currentMode, setCurrentMode] = useState(mode);
+
+  // イベントIDが入力された際、自動的に「新規参加」タブに切り替える
+  useEffect(() => {
+    if (eventId && eventId.trim().length > 0 && currentMode === 'history') {
+      setCurrentMode('join');
+    }
+  }, [eventId, currentMode]);
   const [responseHistory, setResponseHistory] = useState([]);
 
   // URLからイベントIDを抽出する関数
@@ -54,6 +61,11 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
       setTimeout(() => {
         console.log(`URLからイベントIDを抽出しました: ${extractedId}`);
       }, 100);
+    }
+
+    // IDが入力されたら自動で「新規参加」タブへ
+    if (extractedId.trim()) {
+      setCurrentMode('join');
     }
   }, []);
 
@@ -557,11 +569,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     {event && event.description && (
     <div className="event-description client-description">
       <strong>イベント説明:</strong><br />
-      <span
-        dangerouslySetInnerHTML={{
-          __html: event.description.replace(/\n/g, '<br />')
-        }}
-      />
+      <span>{event.description}</span>
     </div>
     )}
 
