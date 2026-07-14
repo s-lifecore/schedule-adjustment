@@ -23,6 +23,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     }
   }, [eventId, currentMode]);
   const [responseHistory, setResponseHistory] = useState([]);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   // URLからイベントIDを抽出する関数
   const extractEventIdFromUrl = (input) => {
@@ -415,12 +416,18 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     }));
   };
 
-  const submitResponse = async () => {
+  // 確認画面へ進む
+  const handleToConfirm = () => {
     if (!participantName.trim()) {
       alert('お名前を入力してください');
       return;
     }
+    setIsConfirming(true);
+    // 確認画面へスクロール
+    window.scrollTo(0, 0);
+  };
 
+  const submitResponse = async () => {
     // 回答期限チェック
     if (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) {
       alert('回答期限を過ぎているため、回答できません。');
@@ -843,15 +850,79 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
             )}
           </div>
 
-          <button 
-            onClick={submitResponse} 
-            disabled={loading || (event.responseDeadline && new Date() > event.responseDeadline.toDate?.())}
-            className="submit-btn"
-          >
-            {loading ? '送信中...' : 
-             (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) ? 
-             '期限切れ' : '回答を送信'}
-          </button>
+          {isConfirming ? (
+            <div className="confirmation-view">
+              <div className="confirmation-banner">
+                <h3>入力内容の確認</h3>
+                <p>以下の内容で送信します。よろしいですか？</p>
+              </div>
+
+              <div className="confirmation-content">
+                <div className="confirm-item">
+                  <strong>お名前:</strong>
+                  <span>{participantName}</span>
+                </div>
+
+                <div className="confirm-item">
+                  <strong>参加可能時間帯:</strong>
+                  {Object.entries(timeSlots).some(([_, slots]) => slots.length > 0) ? (
+                    <div className="confirm-slots-list">
+                      {Object.entries(timeSlots)
+                        .filter(([_, slots]) => slots.length > 0)
+                        .map(([date, slots]) => (
+                          <div key={date} className="confirm-date-group">
+                            <span className="confirm-date">{date}:</span>
+                            <div className="confirm-slots">
+                              {slots.map((slot, idx) => (
+                                <span key={idx} className="confirm-slot-badge">
+                                  {slot.timeRange} {slot.inPersonAvailable ? '(対面可)' : '(オンライン)'}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <span className="no-slots-warning">選択された時間帯はありません</span>
+                  )}
+                </div>
+
+                {memo && (
+                  <div className="confirm-item">
+                    <strong>備考:</strong>
+                    <div className="confirm-memo-text">{memo}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="confirmation-actions">
+                <button 
+                  onClick={() => setIsConfirming(false)} 
+                  className="back-to-edit-btn"
+                  disabled={loading}
+                >
+                  修正する
+                </button>
+                <button 
+                  onClick={submitResponse} 
+                  disabled={loading}
+                  className="submit-btn"
+                >
+                  {loading ? '送信中...' : 'この内容で送信する'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button 
+              onClick={handleToConfirm} 
+              disabled={loading || (event.responseDeadline && new Date() > event.responseDeadline.toDate?.())}
+              className="submit-btn"
+            >
+              {loading ? '処理中...' : 
+               (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) ? 
+               '期限切れ' : '確認画面へ'}
+            </button>
+          )}
           </div>
         )}
         </div>
