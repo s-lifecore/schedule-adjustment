@@ -533,23 +533,15 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
       const message = isUpdate ? 
         '回答を更新しました！履歴も自動で更新されています。' : 
         '回答を送信しました！';
-      alert(message);
       
-      // 履歴を再読み込み（ログインユーザーの場合）
-      if (user) {
-        await loadResponseHistory();
-        // 履歴保存した場合は自動的に履歴タブに切り替え
-        if (saveHistory) {
-          setCurrentMode('history');
-        }
-      }
+      // カスタムポップアップまたはalertの後にリダイレクト
+      alert(message + '\n\n3秒後に回答画面へ戻ります。');
       
-      // フォームリセット
-      setParticipantName('');
-      setTimeSlots({});
-      setMemo('');
-      setEvent(null);
-      setEventId('');
+      setLoading(true); // リダイレクト待ちのローディング
+      
+      setTimeout(() => {
+        window.location.href = 'https://s-ad.vercel.app/event/join';
+      }, 3000);
       
     } catch (error) {
       console.error('回答送信エラー:', error);

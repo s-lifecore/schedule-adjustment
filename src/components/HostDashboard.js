@@ -184,7 +184,24 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
     setLoading(true);
     try {
-      // イベントドキュメントを削除
+      // 1. 回答（responses）を取得して削除
+      const responsesRef = collection(db, 'events', eventId, 'responses');
+      const responsesSnapshot = await getDocs(responsesRef);
+      
+      const deletePromises = responsesSnapshot.docs.map(async (responseDoc) => {
+        // 1.1 各回答の timeSlots を削除
+        const timeSlotsRef = collection(db, 'events', eventId, 'responses', responseDoc.id, 'timeSlots');
+        const timeSlotsSnapshot = await getDocs(timeSlotsRef);
+        const slotDeletePromises = timeSlotsSnapshot.docs.map(slotDoc => deleteDoc(slotDoc.ref));
+        await Promise.all(slotDeletePromises);
+        
+        // 1.2 回答本体を削除
+        return deleteDoc(responseDoc.ref);
+      });
+      
+      await Promise.all(deletePromises);
+
+      // 2. イベント本体を削除
       await deleteDoc(doc(db, 'events', eventId));
       
       // イベント一覧を再読み込み
