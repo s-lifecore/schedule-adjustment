@@ -256,21 +256,22 @@ function App() {
       default:
         return (
           <div className="home">
-            <h1>日程調整ツール</h1>
-            
+            <h1>都合のいい時間を、ひと目で。</h1>
+            <p>予定を作って共有するか、参加者として回答してください。</p>
+
             {isSharedLinkAccess && selectedEventId && (
               <div className="shared-link-banner">
-                <h2>イベントへの招待</h2>
-                <p>イベントの共有リンクからアクセスされました</p>
+                <h2>予定への招待</h2>
+                <p>共有リンクからアクセスしました。そのまま回答に進めます。</p>
                 <div className="banner-actions">
-                  <button 
+                  <button
                     className="nav-btn client-btn primary"
                     onClick={() => navigateTo('client-join')}
                   >
-                    イベントに参加する
-                    <small>（すぐに回答できます）</small>
+                    予定に参加する
+                    <small>すぐに回答できます</small>
                   </button>
-                  <button 
+                  <button
                     className="nav-btn secondary"
                     onClick={() => {
                       setIsSharedLinkAccess(false);
@@ -286,33 +287,33 @@ function App() {
             )}
             
             <div className="nav-buttons">
-              <button 
+              <button
                 className="nav-btn host-btn"
                 onClick={() => navigateTo('host')}
               >
-                ホストとして開始
-                <small>（ログイン必要）</small>
+                予定を作成する
+                <small>日程の候補を決めて、参加者を募集します（ログイン必要）</small>
               </button>
-              <button 
+              <button
                 className="nav-btn client-btn"
                 onClick={() => navigateTo('client-join')}
               >
-                新規参加
-                <small>（ログイン不要）</small>
+                予定に参加する
+                <small>共有された予定に回答します（ログイン不要）</small>
               </button>
-              <button 
+              <button
                 className="nav-btn client-btn"
                 onClick={() => navigateTo('client-history')}
               >
                 回答履歴を見る
-                <small>（ログイン必要）</small>
+                <small>過去に回答した予定を確認します（ログイン必要）</small>
               </button>
-              <button 
+              <button
                 className="nav-btn usage-btn"
                 onClick={() => navigateTo('usage')}
               >
                 使い方を見る
-                <small>（機能の説明）</small>
+                <small>アプリの機能を説明します</small>
               </button>
               {!user && (
                 <button 
@@ -345,6 +346,10 @@ function App() {
 
   return (
     <div className="App">
+      <header className="app-head">
+        <div className="mark" onClick={() => navigateTo('home')}><span>時間</span>調整</div>
+        <div className="sub">SCHEDULE COORDINATOR</div>
+      </header>
       {renderContent()}
       {showUserProfile && user && (
         <UserProfile
