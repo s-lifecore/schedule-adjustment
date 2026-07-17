@@ -650,7 +650,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                 </p>
                 {new Date() > event.responseDeadline.toDate?.() && (
                   <div className="deadline-expired-message">
-                    <p>⚠️ 回答期限を過ぎているため、新規回答・変更はできません。</p>
+                    <p>回答期限を過ぎているため、新規回答・変更はできません。</p>
                   </div>
                 )}
               </div>
@@ -670,7 +670,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
             />
             {user && participantName && (
               <small className="name-hint">
-                💡 以前と同じ名前が入力されています。必要に応じて修正してください。
+                以前と同じ名前が入力されています。必要に応じて修正してください。
               </small>
             )}
           </div>
@@ -689,7 +689,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                       <div className="time-slot-info">
                         <span className="time-range">{slot.timeRange}</span>
                         <span className={`in-person-status ${slot.inPersonAvailable ? 'available' : 'not-available'}`}>
-                          {slot.inPersonAvailable ? '👥 対面可' : '💻 オンラインのみ'}
+                          {slot.inPersonAvailable ? '対面可' : 'オンラインのみ'}
                         </span>
                       </div>
                       <button onClick={() => removeTimeSlot(date, index)} className="remove-btn">
@@ -805,7 +805,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
             {user ? (
               <div className="logged-in-history-info">
                 <p className="auto-save-info">
-                  ✓ ログイン中のため、回答は自動的に履歴として保存されます
+                  ログイン中のため、回答は自動的に履歴として保存されます
                   {Object.keys(timeSlots).length > 0 && (
                     <small>（既に回答済みの場合は履歴が更新されます）</small>
                   )}

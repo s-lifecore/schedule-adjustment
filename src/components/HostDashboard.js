@@ -419,9 +419,9 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
               </button>
 
               {/* 連続日程入力 */}
-              <div className="date-range-input" style={{marginTop: '16px'}}>
-                <label style={{display:'block', marginBottom:'6px'}}>連続日程を一括追加</label>
-                <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+              <div className="date-range-input">
+                <label>連続日程を一括追加</label>
+                <div>
                   <input
                     type="date"
                     value={rangeStart}
@@ -473,7 +473,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                     連続日程を追加
                   </button>
                 </div>
-                <small style={{color:'#666'}}>開始日〜終了日までの全日付を候補日程に一括追加します</small>
+                <small>開始日〜終了日までの全日付を候補日程に一括追加します</small>
               </div>
             </div>
 
@@ -625,14 +625,13 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                   <p>候補日: {event.candidateDates.join(', ')}</p>
                   {event.responseDeadline && (
                     <p>
-                      <strong>回答期限:</strong> {event.responseDeadline.toDate?.()?.toLocaleString?.() || '不明'}
-                      {new Date() > event.responseDeadline.toDate?.() && (
-                        <span className="expired"> (期限切れ)</span>
-                      )}
+                      <span className={`deadline-badge${new Date() > event.responseDeadline.toDate?.() ? ' over' : ''}`}>
+                        締切 {event.responseDeadline.toDate?.()?.toLocaleString?.() || '不明'}
+                        {new Date() > event.responseDeadline.toDate?.() && '（期限切れ）'}
+                      </span>
                     </p>
                   )}
-                  <p>作成日: {event.createdAt?.toDate?.()?.toLocaleDateString?.() || '不明'}</p>
-                  <p>回答数: {event.responseCount || 0}件</p>
+                  <p>作成日: {event.createdAt?.toDate?.()?.toLocaleDateString?.() || '不明'} ／ 回答数: {event.responseCount || 0}件</p>
                   <div className="event-actions">
                     <button onClick={() => viewEventResults(event.id)}>詳細を見る</button>
                     <button onClick={() => copyShareLink(event.id)}>共有リンクをコピー</button>

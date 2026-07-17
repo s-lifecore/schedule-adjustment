@@ -82,87 +82,89 @@ const AuthComponent = ({ onSuccess, purpose, onNavigate }) => {
     <div className="auth-container">
       <h2>{getPurposeTitle()}</h2>
       <p className="auth-message">{getPurposeMessage()}</p>
-      
-      <button 
-        onClick={signInWithGoogle}
-        disabled={loading}
-        className="google-signin-btn"
-      >
-        {loading ? '処理中...' : 'Googleでログイン'}
-      </button>
 
-      <div className="divider">
-        <span>または</span>
-      </div>
+      <div className="card">
+        <button
+          onClick={signInWithGoogle}
+          disabled={loading}
+          className="google-signin-btn"
+        >
+          {loading ? '処理中...' : 'Googleでログイン'}
+        </button>
 
-      <form onSubmit={handleEmailAuth}>
-        <div className="form-group">
-          <label htmlFor="email" className="sr-only">メールアドレス</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="メールアドレス"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+        <div className="divider">
+          <span>または</span>
         </div>
-        <div className="form-group">
-          <label htmlFor="password" className="sr-only">パスワード</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            placeholder="パスワード"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {!isLogin && (
+
+        <form onSubmit={handleEmailAuth}>
           <div className="form-group">
-            <label htmlFor="confirm-password" className="sr-only">パスワード確認</label>
+            <label htmlFor="email" className="sr-only">メールアドレス</label>
             <input
-              id="confirm-password"
-              name="confirmPassword"
-              type="password"
-              placeholder="パスワード確認"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              id="email"
+              name="email"
+              type="email"
+              placeholder="メールアドレス"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
-            {confirmPassword && password !== confirmPassword && (
-              <div className="password-mismatch">パスワードが一致しません</div>
-            )}
           </div>
-        )}
-        <button 
-          type="submit" 
-          disabled={loading || (!isLogin && password !== confirmPassword)}
-        >
-          {loading ? '処理中...' : (isLogin ? 'ログイン' : 'アカウント作成')}
-        </button>
-      </form>
+          <div className="form-group">
+            <label htmlFor="password" className="sr-only">パスワード</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="パスワード"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {!isLogin && (
+            <div className="form-group">
+              <label htmlFor="confirm-password" className="sr-only">パスワード確認</label>
+              <input
+                id="confirm-password"
+                name="confirmPassword"
+                type="password"
+                placeholder="パスワード確認"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+              {confirmPassword && password !== confirmPassword && (
+                <div className="password-mismatch">パスワードが一致しません</div>
+              )}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={loading || (!isLogin && password !== confirmPassword)}
+          >
+            {loading ? '処理中...' : (isLogin ? 'ログイン' : 'アカウント作成')}
+          </button>
+        </form>
 
-      <p>
-        {isLogin ? 'アカウントをお持ちでない方は' : 'すでにアカウントをお持ちの方は'}
-        <button 
-          type="button" 
-          onClick={() => {
-            setIsLogin(!isLogin);
-            setPassword('');
-            setConfirmPassword('');
-            setError('');
-          }}
-          className="link-btn"
-        >
-          {isLogin ? 'アカウント作成' : 'ログイン'}
-        </button>
-      </p>
+        <p>
+          {isLogin ? 'アカウントをお持ちでない方は' : 'すでにアカウントをお持ちの方は'}
+          <button
+            type="button"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setPassword('');
+              setConfirmPassword('');
+              setError('');
+            }}
+            className="link-btn"
+          >
+            {isLogin ? 'アカウント作成' : 'ログイン'}
+          </button>
+        </p>
 
-      {error && <p className="error">{error}</p>}
-      
+        {error && <p className="error">{error}</p>}
+      </div>
+
       {purpose === 'general' && onNavigate && (
         <div className="auth-options">
           <h3>ログイン後の選択肢</h3>
