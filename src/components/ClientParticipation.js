@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToast, ToastContainer } from './Toast';
+import ConfirmModal from './ConfirmModal';
 
 const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSharedLinkAccess = false, sharedEventId }) => {
   const [eventId, setEventId] = useState(sharedEventId || initialEventId || '');
@@ -22,6 +23,18 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const [submitSuccess, setSubmitSuccess] = useState(null);
   const { toast, toasts } = useToast();
   const [expandedResponses, setExpandedResponses] = useState(new Set());
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null });
+  const closeConfirmModal = () => setConfirmModal({ isOpen: false, onConfirm: null });
+  const deleteHistoryItem = async (responseId) => {
+    try {
+      await deleteDoc(doc(db, 'userResponses', responseId));
+      setResponseHistory(prev => prev.filter(r => r.id !== responseId));
+      toast.success('履歴を削除しました');
+    } catch (e) {
+      toast.error('削除に失敗しました');
+    }
+  };
+
   const toggleExpandResponse = (id) => setExpandedResponses(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -250,7 +263,8 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
               participantName: responseData.participantName,
               submittedAt: responseData.submittedAt,
               timeSlots: responseData.timeSlots,
-              memo: responseData.memo
+              memo: responseData.memo,
+              isDeleted: !eventDoc.exists(),
             };
           } catch (eventError) {
             console.error('イベント情報取得エラー:', eventError);
@@ -569,7 +583,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
       setSubmitSuccess(message);
 
       setTimeout(() => {
-        window.location.href = 'https://s-ad.vercel.app/event/join';
+        window.location.href = '/event/history';
       }, 3000);
 
     } catch (error) {
@@ -915,7 +929,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                 {submitSuccess ? (
                   <div className="confirm-success">
                     <p className="confirm-success-message">{submitSuccess}</p>
-                    <small className="confirm-success-hint">3秒後に回答画面へ戻ります…</small>
+                    <small className="confirm-success-hint">3秒後に回答履歴画面へ移動します…</small>
                   </div>
                 ) : (
                   <>
@@ -1024,7 +1038,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                 </button>
               </div>
               {responseHistory.map((response) => (
-                <div key={response.id} className="history-item">
+                <div key={response.id} className={`history-item${response.isDeleted ? ' history-item-deleted' : ''}`}>
                   <div className="event-card-summary">
                     <div className="event-card-main">
                       <h4>{response.eventTitle}</h4>
@@ -1032,12 +1046,25 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                         <span>回答日時: {response.submittedAt?.toDate?.()?.toLocaleString?.() || '日時不明'}</span>
                       </p>
                     </div>
-                    <button
-                      className="event-expand-btn"
-                      onClick={() => toggleExpandResponse(response.id)}
-                    >
-                      {expandedResponses.has(response.id) ? '閉じる' : '詳細を見る'}
-                    </button>
+                    <div className="event-card-actions">
+                      {response.isDeleted && (
+                        <button
+                          className="history-delete-btn"
+                          onClick={() => setConfirmModal({
+                            isOpen: true,
+                            onConfirm: () => { closeConfirmModal(); deleteHistoryItem(response.id); },
+                          })}
+                        >
+                          削除
+                        </button>
+                      )}
+                      <button
+                        className="event-expand-btn"
+                        onClick={() => toggleExpandResponse(response.id)}
+                      >
+                        {expandedResponses.has(response.id) ? '閉じる' : '詳細を見る'}
+                      </button>
+                    </div>
                   </div>
 
                   {expandedResponses.has(response.id) && (
@@ -1095,6 +1122,15 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
         </div>
       )}
       <ToastContainer toasts={toasts} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title="削除しますか？"
+        message="この履歴を削除します。この操作は取り消せません。"
+        confirmLabel="削除する"
+        cancelLabel="やめておく"
+        onConfirm={confirmModal.onConfirm}
+        onCancel={closeConfirmModal}
+      />
     </div>
   );
 };

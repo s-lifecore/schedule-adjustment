@@ -801,8 +801,22 @@ small{
 .history-header-section{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 .history-header-section h3{ margin:0; }
 .history-item{ }
+.history-item-deleted{ opacity:.6; }
+.history-item-deleted h4{ color:var(--ink-soft); }
 .history-header{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:8px; }
 .history-header h4{ margin:0; }
+.event-card-actions{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.history-delete-btn{
+  font-size:12px;
+  color:var(--danger);
+  background:none;
+  border:1px solid var(--danger);
+  border-radius:6px;
+  padding:4px 10px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.history-delete-btn:hover{ background:var(--danger-bg); }
 .submitted-date{ font-family:'DM Mono', monospace; font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
 .response-details{ margin-bottom:10px; font-size:13.5px; }
 .response-details p{ margin:0 0 6px; font-size:13.5px; }

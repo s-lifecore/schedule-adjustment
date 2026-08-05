@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function ConfirmModal({ isOpen, title, message, confirmLabel = '削除する', onConfirm, onCancel }) {
+export default function ConfirmModal({ isOpen, title, message, confirmLabel = '削除する', cancelLabel = 'キャンセル', onConfirm, onCancel }) {
   if (!isOpen) return null;
   return (
     <div className="modal-overlay" onClick={onCancel}>
@@ -8,7 +8,7 @@ export default function ConfirmModal({ isOpen, title, message, confirmLabel = '�
         {title && <h3 className="modal-title">{title}</h3>}
         <p className="modal-message">{message}</p>
         <div className="modal-actions">
-          <button className="modal-btn modal-btn-cancel" onClick={onCancel}>キャンセル</button>
+          <button className="modal-btn modal-btn-cancel" onClick={onCancel}>{cancelLabel}</button>
           <button className="modal-btn modal-btn-danger" onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>

@@ -188,6 +188,8 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
   const closeConfirmModal = () => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  const today = new Date().toISOString().split('T')[0];
+
   // イベント削除機能
   const deleteEvent = (eventId, eventTitle) => {
     setConfirmModal({
@@ -443,6 +445,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                             name={`candidateDate${index}`}
                             type="date"
                             value={date}
+                            min={today}
                             onChange={(e) => updateDate(index, e.target.value)}
                           />
                           <button
@@ -468,12 +471,14 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                         <input
                           type="date"
                           value={rangeStart}
+                          min={today}
                           onChange={e => setRangeStart(e.target.value)}
                         />
                         <span>〜</span>
                         <input
                           type="date"
                           value={rangeEnd}
+                          min={today}
                           onChange={e => setRangeEnd(e.target.value)}
                         />
                         <button
