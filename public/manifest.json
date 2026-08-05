@@ -1,6 +1,11 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "id": "/",
+  "scope": "/",
+  "short_name": "時間調整",
+  "name": "時間調整 - 都合のいい時間をひと目で",
+  "lang": "ja",
+  "dir": "ltr",
+  "description": "参加者の都合のいい時間帯を集計する日程調整アプリ",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +15,21 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "display_override": ["standalone", "browser"],
+  "orientation": "portrait-primary",
+  "theme_color": "#FAF6EE",
+  "background_color": "#FAF6EE",
+  "categories": ["utilities", "productivity"]
 }

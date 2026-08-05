@@ -27,7 +27,11 @@
   },
   "browserslist": {
     "production": [
-      ">0.2%",
+      "chrome >= 90",
+      "safari >= 14",
+      "firefox >= 88",
+      "edge >= 90",
+      "samsung >= 14",
       "not dead",
       "not op_mini all"
     ],
