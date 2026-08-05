@@ -49,23 +49,23 @@ function computeDaySegments(dateStr, responses) {
 
   for (let s = 0; s < SLOTS_PER_DAY; s++) {
     const slotStart = s * SLOT_MIN;
-    const availableNames = [];
+    const availableIds = new Set();
     for (const r of responses) {
       const slots = getDateSlots(r, dateStr);
       const covered = slots.some(slot => {
         const range = parseTimeRangeToMinutes(slot.timeRange);
         return range && slotStart >= range[0] && slotStart < range[1];
       });
-      if (covered) availableNames.push(r.name);
+      if (covered) availableIds.add(r.id);
     }
-    const count = availableNames.length;
+    const count = availableIds.size;
     let status = 'partial';
     let missing = null;
     if (total > 0 && count === total) {
       status = 'full';
     } else if (total >= 2 && count === total - 1) {
       status = 'almost';
-      missing = responses.map(r => r.name).filter(n => !availableNames.includes(n));
+      missing = responses.filter(r => !availableIds.has(r.id)).map(r => r.name || '不明');
     }
     slotStatus[s] = { status, missing };
   }
