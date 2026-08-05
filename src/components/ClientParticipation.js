@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToast, ToastContainer } from './Toast';
@@ -22,6 +22,8 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const [existingResponseNotice, setExistingResponseNotice] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(null);
   const { toast, toasts } = useToast();
+  const pendingTimeSlotsRef = useRef(null);
+  const [triggerSearch, setTriggerSearch] = useState(false);
   const [expandedResponses, setExpandedResponses] = useState(new Set());
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null });
   const closeConfirmModal = () => setConfirmModal({ isOpen: false, onConfirm: null });
@@ -113,11 +115,12 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
       if (eventSnapshot.exists()) {
         const foundEvent = { id: eventSnapshot.id, ...eventSnapshot.data() };
         setEvent(foundEvent);
-        // 各候補日の時間帯を初期化
+        // 各候補日の時間帯を初期化（復元データがあれば優先して適用）
         const initialTimeSlots = {};
         foundEvent.candidateDates.forEach(date => {
-          initialTimeSlots[date] = [];
+          initialTimeSlots[date] = pendingTimeSlotsRef.current?.[date] ?? [];
         });
+        pendingTimeSlotsRef.current = null;
         setTimeSlots(initialTimeSlots);
         
         // ログインユーザーの場合、既存の回答があるかチェック
@@ -201,18 +204,16 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
         try {
           const state = JSON.parse(savedState);
           if (state.returnTo === 'client-join') {
-            // 保存された状態を復元
+            // スロットは ref に保持し、findEvent 後に適用
+            if (state.timeSlots) pendingTimeSlotsRef.current = state.timeSlots;
             setEventId(state.eventId || '');
             setParticipantName(state.participantName || '');
-            setTimeSlots(state.timeSlots || {});
             setMemo(state.memo || '');
             setSaveHistory(state.saveHistory || false);
-            
-            // セッションストレージをクリア
             sessionStorage.removeItem('preLoginState');
-            
-            // 元の回答画面に遷移
             window.history.replaceState({}, '', '/event/join');
+            // eventId のセット後に自動検索を走らせる
+            setTriggerSearch(true);
           }
         } catch (error) {
           console.log('保存状態の復元エラー:', error);
@@ -232,6 +233,14 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
       setParticipantName(user.displayName);
     }
   }, [user, participantName]);
+
+  // sessionStorage 復元後の自動検索
+  useEffect(() => {
+    if (triggerSearch && eventId) {
+      setTriggerSearch(false);
+      findEvent();
+    }
+  }, [triggerSearch, eventId, findEvent]);
 
   // ユーザーの回答履歴を取得する関数
   const loadResponseHistory = useCallback(async () => {

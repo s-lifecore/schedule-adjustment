@@ -894,13 +894,22 @@ small{
 .empty-note{ color:var(--ink-soft); font-size:13px; padding:8px 0; }
 
 .participant-list{ margin-top:8px; font-size:13px; }
-.participant-list .p-row{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); }
-.participant-list .p-row:last-child{ border-bottom:none; }
-.participant-list .p-name{ font-weight:500; flex-shrink:0; }
-.participant-list .p-time{ font-family:'DM Mono', monospace; color:var(--ink-soft); font-size:12px; text-align:right; }
-.participant-list .p-memo{ color:var(--ink-soft); font-size:12px; margin-top:2px; white-space:pre-wrap; }
-
-.response-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.participant-list .p-entry{
+  padding:8px 0;
+  border-bottom:1px solid var(--line);
+}
+.participant-list .p-entry:last-child{ border-bottom:none; }
+.participant-list .p-row{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+}
+.participant-list .p-info{ flex:0 0 auto; min-width:0; }
+.participant-list .p-name{ font-weight:500; display:block; white-space:nowrap; }
+.participant-list .p-submitted-at{ font-size:11px; color:var(--ink-soft); display:block; margin-top:1px; white-space:nowrap; }
+.participant-list .p-memo{ color:var(--ink-soft); font-size:12px; margin-top:4px; padding-left:2px; white-space:pre-wrap; }
+.participant-list .p-time{ flex:1; font-family:'DM Mono', monospace; color:var(--ink-soft); font-size:12px; }
+.participant-list .delete-response-btn{ flex-shrink:0; align-self:flex-start; }
 
 /* ==========================================================================
    Usage guide
@@ -945,12 +954,80 @@ small{
 /* ==========================================================================
    Responsive
    ========================================================================== */
+/* スマートフォン向けレスポンシブ
+   ========================================================================== */
+
+/* タッチ操作向けフォントサイズ固定（iOS自動ズーム防止） */
+@media (max-width:640px){
+  input[type=text], input[type=email], input[type=password],
+  input[type=datetime-local], input[type=date], textarea, select{
+    font-size:16px;
+  }
+}
+
+@media (max-width:600px){
+  .App, .container{ padding:20px 14px 72px; }
+
+  /* バナー */
+  .banner-actions{ flex-direction:column; }
+  .banner-actions button{ min-width:0; width:100%; }
+
+  /* モーダル余白 */
+  .modal-box{ padding:22px 16px 16px; }
+  .modal-actions{ flex-direction:column-reverse; gap:8px; }
+  .modal-btn{ width:100%; text-align:center; }
+
+  /* 回答送信確認モーダル */
+  .confirm-modal-box{ max-height:90vh; }
+}
+
 @media (max-width:480px){
+  .App, .container{ padding:14px 12px 64px; }
+
+  /* ヘッダー */
+  .app-head{ padding-bottom:10px; margin-bottom:18px; }
+  .header{ gap:10px; padding-bottom:10px; margin-bottom:18px; }
+
+  /* フォームアクション — スタック */
+  .form-actions{ flex-direction:column-reverse; }
+  .form-actions button{ width:100%; }
+
+  /* 日付入力 */
   .date-input{ flex-wrap:wrap; }
+  .date-range-input > div input{ min-width:100px; }
+  .date-input-mode-selector{ flex-direction:column; }
+  .mode-btn{ padding:12px 10px; }
+
+  /* イベントカードのアクション */
+  .event-actions{ flex-direction:column; }
+  .event-actions button{ width:100%; justify-content:center; }
+  .edit-actions{ flex-direction:column; }
+  .edit-actions button{ width:100%; }
+
+  /* タイムスロット入力 */
   .time-slots{ flex-direction:column; align-items:stretch; }
   .time-inputs{ flex-wrap:wrap; }
-  .event-actions button{ flex:1 1 auto; }
+  .time-input-buttons{ flex-direction:column; gap:8px; }
+  .time-input-buttons button{ width:100%; justify-content:center; }
+
+  /* 参加者一覧 — モバイルで縦積み */
+  .participant-list .p-row{ flex-wrap:wrap; gap:6px; }
+  .participant-list .p-time{ width:100%; flex:none; order:3; }
+  .participant-list .delete-response-btn{ margin-left:auto; }
+
+  /* 履歴 */
   .history-header{ flex-direction:column; align-items:flex-start; gap:2px; }
+  .event-card-actions{ align-self:flex-start; }
+  .history-actions{ flex-direction:column; }
+  .history-actions button{ width:100%; justify-content:center; }
+
+  /* タイムライン文字サイズ */
+  .ruler .tick{ font-size:9px; }
+  .legend-list .time{ min-width:90px; font-size:12px; }
+  .legend-list .desc{ font-size:12px; }
+
+  /* 送信・作成ボタン */
+  .create-btn, .submit-btn{ padding:13px 18px; }
 }
 
 /* ==========================================================================

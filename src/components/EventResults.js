@@ -328,21 +328,26 @@ const EventResults = ({ eventId, onBack }) => {
               }).join(' / ');
 
               return (
-                <div key={response.id} className="p-row">
-                  <div>
-                    <div className="response-header">
+                <div key={response.id} className="p-entry">
+                  <div className="p-row">
+                    <div className="p-info">
                       <span className="p-name">{response.name}</span>
-                      <button
-                        className="delete-response-btn"
-                        onClick={() => deleteResponse(response.id, response.name)}
-                        disabled={loading}
-                      >
-                        削除
-                      </button>
+                      <span className="p-submitted-at">
+                        {response.submittedAt?.toDate?.()?.toLocaleString?.() || ''}
+                      </span>
                     </div>
-                    {response.memo && <div className="p-memo">備考: {response.memo}</div>}
+                    <span className="p-time">{summary}</span>
+                    <button
+                      className="delete-response-btn"
+                      onClick={() => deleteResponse(response.id, response.name)}
+                      disabled={loading}
+                    >
+                      削除
+                    </button>
                   </div>
-                  <span className="p-time">{summary}</span>
+                  {response.memo && (
+                    <div className="p-memo">備考: {response.memo}</div>
+                  )}
                 </div>
               );
             })}
