@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { useToast, ToastContainer } from './Toast';
 
 const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSharedLinkAccess = false, sharedEventId }) => {
   const [eventId, setEventId] = useState(sharedEventId || initialEventId || '');
@@ -14,7 +15,21 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [timeSlotInPersonAvailable, setTimeSlotInPersonAvailable] = useState(false);
+  const [showAllDayFor, setShowAllDayFor] = useState(null);
+  const [allDayInPerson, setAllDayInPerson] = useState(false);
   const [currentMode, setCurrentMode] = useState(mode);
+  const [existingResponseNotice, setExistingResponseNotice] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(null);
+  const { toast, toasts } = useToast();
+  const [expandedResponses, setExpandedResponses] = useState(new Set());
+  const toggleExpandResponse = (id) => setExpandedResponses(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const sortByInPerson = (slots) =>
+    [...slots].sort((a, b) => (b.inPersonAvailable ? 1 : 0) - (a.inPersonAvailable ? 1 : 0));
 
   // イベントIDが入力された際、自動的に「新規参加」タブに切り替える
   useEffect(() => {
@@ -72,7 +87,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
 
   const findEvent = useCallback(async () => {
     if (!eventId.trim()) {
-      alert('イベントIDを入力してください');
+      toast.error('イベントIDを入力してください');
       return;
     }
 
@@ -125,16 +140,13 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
               timeSlotsSnapshot.docs.forEach(doc => {
                 const slotData = doc.data();
                 if (slotData.date && slotData.timeSlots) {
-                  existingTimeSlots[slotData.date] = slotData.timeSlots;
+                  existingTimeSlots[slotData.date] = sortByInPerson(slotData.timeSlots);
                 }
               });
               
               setTimeSlots(existingTimeSlots);
               
-              // 既存回答があることをユーザーに通知
-              setTimeout(() => {
-                alert('以前の回答が見つかりました。\n参加者名、時間選択、メモが自動入力されています。\n必要に応じて修正してから再送信してください。');
-              }, 500);
+              setExistingResponseNotice(true);
             }
           } catch (error) {
             console.error('既存回答の取得エラー:', error);
@@ -144,14 +156,14 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
         
         // イベント読み込み完了
       } else {
-        alert('イベントが見つかりませんでした');
+        toast.error('イベントが見つかりませんでした');
       }
     } catch (error) {
       console.error('イベント検索エラー:', error);
-      alert('イベント検索に失敗しました');
+      toast.error('イベント検索に失敗しました');
     }
     setLoading(false);
-  }, [eventId, user]);
+  }, [eventId, user, toast]);
 
   // 初期イベントIDが提供された場合、自動的にイベントを検索
   useEffect(() => {
@@ -279,22 +291,26 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
 
   const addTimeSlot = (date) => {
     setShowTimeInputFor(date);
+    setShowAllDayFor(null);
     setStartTime('');
     setEndTime('');
-    setTimeSlotInPersonAvailable(event?.defaultInPersonAvailable || false); // イベントのデフォルト設定を使用
+    setTimeSlotInPersonAvailable(event?.defaultInPersonAvailable || false);
   };
 
-  // 全日可ボタンのハンドラー
+  // 全日可ボタン：対面選択フォームを表示
   const addAllDaySlot = (date) => {
-    const timeSlotObj = {
-      timeRange: '09:00-21:00',
-      inPersonAvailable: event?.defaultInPersonAvailable || false
-    };
-    
+    setShowAllDayFor(date);
+    setAllDayInPerson(event?.defaultInPersonAvailable || false);
+    setShowTimeInputFor(null);
+  };
+
+  const confirmAllDaySlot = (date) => {
     setTimeSlots(prev => ({
       ...prev,
-      [date]: [...prev[date], timeSlotObj]
+      [date]: sortByInPerson([...prev[date], { timeRange: '09:00-21:00', inPersonAvailable: allDayInPerson }])
     }));
+    setShowAllDayFor(null);
+    setAllDayInPerson(false);
   };
 
   // 全角数字を半角に変換する関数
@@ -312,7 +328,6 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     return timeStr;
   };
 
-  // 時間の妥当性チェック関数
   const isValidTime = (timeStr) => {
     if (timeStr.length !== 4) return false;
     const hours = parseInt(timeStr.slice(0, 2));
@@ -320,79 +335,90 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
   };
 
-  // 数字のみの入力制限と時間バリデーション
-  const handleTimeInput = (value, setter) => {
-    // 全角を半角に変換
+  // 終了時間用：2400（深夜0時）まで許容
+  const isValidEndTime = (timeStr) => {
+    if (timeStr.length !== 4) return false;
+    if (timeStr === '2400') return true;
+    return isValidTime(timeStr);
+  };
+
+  // maxHour: 開始時間は23、終了時間は24
+  const handleTimeInput = (value, setter, maxHour = 23) => {
     let converted = convertToHalfWidth(value);
-    // 数字以外を除去
     converted = converted.replace(/[^0-9]/g, '');
-    
-    // 4桁に制限
+
     if (converted.length <= 4) {
-      // 段階的な時間チェック
       if (converted.length >= 2) {
         const hours = parseInt(converted.slice(0, 2));
-        if (hours > 23) {
-          // 時が23を超える場合は23に制限
-          converted = '23' + converted.slice(2);
+        if (hours > maxHour) {
+          toast.error('翌日の時間帯に入力してください');
+          converted = String(maxHour).padStart(2, '0') + converted.slice(2);
+        } else if (hours === 24 && converted.length === 4) {
+          const minutes = parseInt(converted.slice(2, 4));
+          if (minutes > 0) {
+            toast.error('翌日の時間帯に入力してください');
+            converted = '2400';
+          }
+        } else if (hours < 24 && converted.length === 4) {
+          const minutes = parseInt(converted.slice(2, 4));
+          if (minutes > 59) {
+            converted = converted.slice(0, 2) + '59';
+          }
         }
       }
-      
-      if (converted.length === 4) {
-        const minutes = parseInt(converted.slice(2, 4));
-        if (minutes > 59) {
-          // 分が59を超える場合は59に制限
-          converted = converted.slice(0, 2) + '59';
-        }
-      }
-      
       setter(converted);
     }
   };
 
   const confirmTimeSlot = (date) => {
     if (!startTime || !endTime) {
-      alert('開始時間と終了時間を入力してください');
+      toast.error('開始時間と終了時間を入力してください');
       return;
     }
-    
-    // 最終的な半角変換（念のため）
+
     const normalizedStartTime = convertToHalfWidth(startTime);
     const normalizedEndTime = convertToHalfWidth(endTime);
-    
-    // 4桁チェック
+
     if (normalizedStartTime.length !== 4 || normalizedEndTime.length !== 4) {
-      alert('時間は4桁の数字で入力してください (例: 0900 → 09:00として表示されます)');
+      toast.error('時間は4桁の数字で入力してください（例: 0900）');
       return;
     }
-    
-    // 時間の妥当性チェック
+
     if (!isValidTime(normalizedStartTime)) {
-      alert('開始時間が正しくありません。時間は00-23、分は00-59で入力してください (例: 0900 → 09:00として表示されます)');
+      toast.error('開始時間が正しくありません（時: 00-23、分: 00-59）');
       return;
     }
-    
-    if (!isValidTime(normalizedEndTime)) {
-      alert('終了時間が正しくありません。時間は00-23、分は00-59で入力してください (例: 1200 → 12:00として表示されます)');
+
+    if (!isValidEndTime(normalizedEndTime)) {
+      if (parseInt(normalizedEndTime.slice(0, 2)) > 24) {
+        toast.error('翌日の時間帯に入力してください');
+      } else {
+        toast.error('終了時間が正しくありません（時: 00-24、分: 00-59）');
+      }
       return;
     }
-    
-    // 開始時間が終了時間より前かチェック
+
     const startTimeNum = parseInt(normalizedStartTime);
     const endTimeNum = parseInt(normalizedEndTime);
     if (startTimeNum >= endTimeNum) {
-      alert('開始時間は終了時間より前に設定してください');
+      toast.error('開始時間は終了時間より前に設定してください');
       return;
     }
     
-    const timeSlotObj = {
-      timeRange: `${formatTimeDisplay(normalizedStartTime)}-${formatTimeDisplay(normalizedEndTime)}`,
-      inPersonAvailable: timeSlotInPersonAvailable
-    };
-    
+    const timeRange = `${formatTimeDisplay(normalizedStartTime)}-${formatTimeDisplay(normalizedEndTime)}`;
+    const isDuplicate = (timeSlots[date] || []).some(
+      slot => slot.timeRange === timeRange && slot.inPersonAvailable === timeSlotInPersonAvailable
+    );
+    if (isDuplicate) {
+      toast.error('同じ時間帯・参加形式がすでに登録されています');
+      return;
+    }
+
+    const timeSlotObj = { timeRange, inPersonAvailable: timeSlotInPersonAvailable };
+
     setTimeSlots(prev => ({
       ...prev,
-      [date]: [...prev[date], timeSlotObj]
+      [date]: sortByInPerson([...prev[date], timeSlotObj])
     }));
     
     // 入力フォームを閉じる
@@ -419,7 +445,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   // 確認画面へ進む
   const handleToConfirm = () => {
     if (!participantName.trim()) {
-      alert('お名前を入力してください');
+      toast.error('お名前を入力してください');
       return;
     }
     setIsConfirming(true);
@@ -428,9 +454,8 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   };
 
   const submitResponse = async () => {
-    // 回答期限チェック
     if (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) {
-      alert('回答期限を過ぎているため、回答できません。');
+      toast.error('回答期限を過ぎているため回答できません');
       return;
     }
 
@@ -537,22 +562,19 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
         }
       }
       
-      const message = isUpdate ? 
-        '回答を更新しました！履歴も自動で更新されています。' : 
-        '回答を送信しました！';
-      
-      // カスタムポップアップまたはalertの後にリダイレクト
-      alert(message + '\n\n3秒後に回答画面へ戻ります。');
-      
-      setLoading(true); // リダイレクト待ちのローディング
-      
+      const message = isUpdate
+        ? '回答を更新しました。履歴も自動で更新されています。'
+        : '回答を送信しました。';
+
+      setSubmitSuccess(message);
+
       setTimeout(() => {
         window.location.href = 'https://s-ad.vercel.app/event/join';
       }, 3000);
-      
+
     } catch (error) {
       console.error('回答送信エラー:', error);
-      alert('回答送信に失敗しました');
+      toast.error('回答の送信に失敗しました');
     }
     setLoading(false);
   };
@@ -612,6 +634,8 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
         </div>
       )}
 
+
+
       {currentMode === 'join' ? (
         // 新規参加モード
         <div className="join-mode">
@@ -637,6 +661,11 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
         </div>
       ) : (
         <div className="response-form">
+          {existingResponseNotice && (
+            <div className="notice-banner notice-info">
+              以前の回答が見つかりました。参加者名・時間選択・メモが自動入力されています。必要に応じて修正してから再送信してください。
+            </div>
+          )}
           <div className="event-info">
             <h3>{event.title}</h3>
             <p>ホスト: {event.hostName}</p>
@@ -705,7 +734,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                         <div className="time-field">
                           <input
                             type="text"
-                            placeholder="開始時間 (例: 09:00)"
+                            placeholder="0900"
                             value={startTime}
                             onChange={(e) => handleTimeInput(e.target.value, setStartTime)}
                             maxLength="4"
@@ -727,20 +756,20 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                         <div className="time-field">
                           <input
                             type="text"
-                            placeholder="終了時間 (例: 12:00)"
+                            placeholder="1800"
                             value={endTime}
-                            onChange={(e) => handleTimeInput(e.target.value, setEndTime)}
+                            onChange={(e) => handleTimeInput(e.target.value, setEndTime, 24)}
                             maxLength="4"
                             className={
-                              endTime.length === 4 && !isValidTime(endTime) ? 'invalid' :
+                              endTime.length === 4 && !isValidEndTime(endTime) ? 'invalid' :
                               endTime.length !== 4 && endTime.length > 0 ? 'partial' : ''
                             }
                           />
                           <small className="char-count">
                             {endTime.length}/4
                             {endTime.length === 4 && (
-                              <span className={isValidTime(endTime) ? 'valid' : 'invalid-time'}>
-                                {isValidTime(endTime) ? ` ✓ (${formatTimeDisplay(endTime)})` : ' ✗'}
+                              <span className={isValidEndTime(endTime) ? 'valid' : 'invalid-time'}>
+                                {isValidEndTime(endTime) ? ` ✓ (${formatTimeDisplay(endTime)})` : ' ✗'}
                               </span>
                             )}
                           </small>
@@ -761,7 +790,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                       
                       <div className="time-input-buttons">
                         <button onClick={() => confirmTimeSlot(date)} className="confirm-btn">
-                          追加
+                          確定
                         </button>
                         <button onClick={cancelTimeSlot} className="cancel-btn">
                           キャンセル
@@ -769,20 +798,40 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                       </div>
                     </div>
                   ) : (
-                    <div className="add-time-actions">
-                      <button 
-                        onClick={() => addTimeSlot(date)}
-                        className="add-time-btn"
-                      >
-                        時間帯を追加
-                      </button>
-                      <button 
-                        onClick={() => addAllDaySlot(date)}
-                        className="add-all-day-btn"
-                      >
-                        全日可 (09:00-21:00)
-                      </button>
-                    </div>
+                    <>
+                      <div className="add-time-actions">
+                        <button
+                          onClick={() => addTimeSlot(date)}
+                          className="add-time-btn"
+                        >
+                          時間帯を追加
+                        </button>
+                        <button
+                          onClick={() => addAllDaySlot(date)}
+                          className="add-all-day-btn"
+                        >
+                          全日可 (09:00-21:00)
+                        </button>
+                        <small className="add-time-hint">繰り返し追加して複数の時間帯を設定できます</small>
+                      </div>
+                      {showAllDayFor === date && (
+                        <div className="time-input-form all-day-confirm-form">
+                          <label htmlFor={`all-day-in-person-${date}`} className="checkbox-label">
+                            <input
+                              id={`all-day-in-person-${date}`}
+                              type="checkbox"
+                              checked={allDayInPerson}
+                              onChange={(e) => setAllDayInPerson(e.target.checked)}
+                            />
+                            <span className="checkbox-text">この時間帯は対面参加可能</span>
+                          </label>
+                          <div className="time-input-buttons">
+                            <button onClick={() => confirmAllDaySlot(date)} className="confirm-btn">確定</button>
+                            <button onClick={() => setShowAllDayFor(null)} className="cancel-btn">キャンセル</button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -850,78 +899,87 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
             )}
           </div>
 
-          {isConfirming ? (
-            <div className="confirmation-view">
-              <div className="confirmation-banner">
-                <h3>入力内容の確認</h3>
-                <p>以下の内容で送信します。よろしいですか？</p>
-              </div>
+          <button
+            onClick={handleToConfirm}
+            disabled={loading || (event.responseDeadline && new Date() > event.responseDeadline.toDate?.())}
+            className="submit-btn"
+          >
+            {loading ? '処理中...' :
+             (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) ?
+             '期限切れ' : '確認画面へ'}
+          </button>
 
-              <div className="confirmation-content">
-                <div className="confirm-item">
-                  <strong>お名前:</strong>
-                  <span>{participantName}</span>
-                </div>
-
-                <div className="confirm-item">
-                  <strong>参加可能時間帯:</strong>
-                  {Object.entries(timeSlots).some(([_, slots]) => slots.length > 0) ? (
-                    <div className="confirm-slots-list">
-                      {Object.entries(timeSlots)
-                        .filter(([_, slots]) => slots.length > 0)
-                        .map(([date, slots]) => (
-                          <div key={date} className="confirm-date-group">
-                            <span className="confirm-date">{date}:</span>
-                            <div className="confirm-slots">
-                              {slots.map((slot, idx) => (
-                                <span key={idx} className="confirm-slot-badge">
-                                  {slot.timeRange} {slot.inPersonAvailable ? '(対面可)' : '(オンライン)'}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <span className="no-slots-warning">選択された時間帯はありません</span>
-                  )}
-                </div>
-
-                {memo && (
-                  <div className="confirm-item">
-                    <strong>備考:</strong>
-                    <div className="confirm-memo-text">{memo}</div>
+          {isConfirming && (
+            <div className="modal-overlay" onClick={!submitSuccess ? () => setIsConfirming(false) : undefined}>
+              <div className="modal-box confirm-modal-box" onClick={e => e.stopPropagation()}>
+                {submitSuccess ? (
+                  <div className="confirm-success">
+                    <p className="confirm-success-message">{submitSuccess}</p>
+                    <small className="confirm-success-hint">3秒後に回答画面へ戻ります…</small>
                   </div>
+                ) : (
+                  <>
+                    <h3 className="modal-title">入力内容の確認</h3>
+                    <p className="modal-message">以下の内容で送信します。よろしいですか？</p>
+
+                    <div className="confirm-modal-content">
+                      <div className="confirm-item">
+                        <strong>お名前</strong>
+                        <span>{participantName}</span>
+                      </div>
+
+                      <div className="confirm-item">
+                        <strong>参加可能時間帯</strong>
+                        {Object.entries(timeSlots).some(([_, slots]) => slots.length > 0) ? (
+                          <div className="confirm-slots-list">
+                            {Object.entries(timeSlots)
+                              .filter(([_, slots]) => slots.length > 0)
+                              .map(([date, slots]) => (
+                                <div key={date} className="confirm-date-group">
+                                  <span className="confirm-date">{date}</span>
+                                  <div className="confirm-slots">
+                                    {slots.map((slot, idx) => (
+                                      <span key={idx} className="confirm-slot-badge">
+                                        {slot.timeRange} {slot.inPersonAvailable ? '(対面可)' : '(オンライン)'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        ) : (
+                          <span className="no-slots-warning">選択された時間帯はありません</span>
+                        )}
+                      </div>
+
+                      {memo && (
+                        <div className="confirm-item">
+                          <strong>備考</strong>
+                          <div className="confirm-memo-text">{memo}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="modal-actions">
+                      <button
+                        onClick={() => setIsConfirming(false)}
+                        className="modal-btn modal-btn-cancel"
+                        disabled={loading}
+                      >
+                        修正する
+                      </button>
+                      <button
+                        onClick={submitResponse}
+                        disabled={loading}
+                        className="modal-btn modal-btn-primary"
+                      >
+                        {loading ? '送信中...' : 'この内容で送信する'}
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
-
-              <div className="confirmation-actions">
-                <button 
-                  onClick={() => setIsConfirming(false)} 
-                  className="back-to-edit-btn"
-                  disabled={loading}
-                >
-                  修正する
-                </button>
-                <button 
-                  onClick={submitResponse} 
-                  disabled={loading}
-                  className="submit-btn"
-                >
-                  {loading ? '送信中...' : 'この内容で送信する'}
-                </button>
-              </div>
             </div>
-          ) : (
-            <button 
-              onClick={handleToConfirm} 
-              disabled={loading || (event.responseDeadline && new Date() > event.responseDeadline.toDate?.())}
-              className="submit-btn"
-            >
-              {loading ? '処理中...' : 
-               (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) ? 
-               '期限切れ' : '確認画面へ'}
-            </button>
           )}
           </div>
         )}
@@ -967,67 +1025,76 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
               </div>
               {responseHistory.map((response) => (
                 <div key={response.id} className="history-item">
-                  <div className="history-header">
-                    <h4>{response.eventTitle}</h4>
-                    <span className="submitted-date">
-                      {response.submittedAt?.toDate?.()?.toLocaleDateString?.() || '日付不明'}
-                    </span>
-                  </div>
-                  
-                  {response.eventDescription && (
-                    <p className="event-description">{response.eventDescription}</p>
-                  )}
-                  
-                  <div className="response-details">
-                    <p><strong>参加者名:</strong> {response.participantName}</p>
-                    
-                    {Object.keys(response.timeSlots).length > 0 && (
-                      <div className="time-slots-summary">
-                        <p><strong>選択した時間帯:</strong></p>
-                        <ul>
-                          {Object.entries(response.timeSlots).map(([date, slots]) => (
-                            <li key={date}>
-                              <strong>{date}</strong>
-                              <ul>
-                                {slots.map((slot, index) => (
-                                  <li key={index}>
-                                    {slot.timeRange}
-                                    {slot.inPersonAvailable && ' (対面可能)'}
-                                  </li>
-                                ))}
-                              </ul>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    
-                    {response.memo && (
-                      <div className="memo">
-                        <p><strong>メモ:</strong></p>
-                        <p>{response.memo}</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="history-actions">
-                    <button 
-                      className="view-event-btn"
-                      onClick={() => {
-                        setEventId(response.eventId);
-                        setCurrentMode('join');
-                        handleEventIdInput(response.eventId);
-                      }}
+                  <div className="event-card-summary">
+                    <div className="event-card-main">
+                      <h4>{response.eventTitle}</h4>
+                      <p className="event-meta-row">
+                        <span>回答日時: {response.submittedAt?.toDate?.()?.toLocaleString?.() || '日時不明'}</span>
+                      </p>
+                    </div>
+                    <button
+                      className="event-expand-btn"
+                      onClick={() => toggleExpandResponse(response.id)}
                     >
-                      このイベントを表示
+                      {expandedResponses.has(response.id) ? '閉じる' : '詳細を見る'}
                     </button>
                   </div>
+
+                  {expandedResponses.has(response.id) && (
+                    <div className="event-card-detail">
+                      {response.eventDescription && (
+                        <p className="event-description">{response.eventDescription}</p>
+                      )}
+                      <div className="response-details">
+                        <p><strong>参加者名:</strong> {response.participantName}</p>
+                        {Object.keys(response.timeSlots).length > 0 && (
+                          <div className="time-slots-summary">
+                            <p><strong>選択した時間帯:</strong></p>
+                            <ul>
+                              {Object.entries(response.timeSlots).map(([date, slots]) => (
+                                <li key={date}>
+                                  <strong>{date}</strong>
+                                  <ul>
+                                    {slots.map((slot, index) => (
+                                      <li key={index}>
+                                        {slot.timeRange}
+                                        {slot.inPersonAvailable && ' (対面可能)'}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {response.memo && (
+                          <div className="memo">
+                            <p><strong>メモ:</strong></p>
+                            <p>{response.memo}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="history-actions">
+                        <button
+                          className="view-event-btn"
+                          onClick={() => {
+                            setEventId(response.eventId);
+                            setCurrentMode('join');
+                            handleEventIdInput(response.eventId);
+                          }}
+                        >
+                          このイベントを表示
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       )}
+      <ToastContainer toasts={toasts} />
     </div>
   );
 };

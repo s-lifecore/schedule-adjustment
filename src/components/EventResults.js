@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { useToast, ToastContainer } from './Toast';
+import ConfirmModal from './ConfirmModal';
 
 const SLOT_MIN = 15;
 const SLOTS_PER_DAY = 1440 / SLOT_MIN;
@@ -37,7 +39,8 @@ function formatDateLabel(dateStr) {
 
 function getDateSlots(response, dateStr) {
   const entry = (response.timeSlots || []).find(ts => ts.date === dateStr);
-  return (entry && entry.timeSlots) || [];
+  const slots = (entry && entry.timeSlots) || [];
+  return [...slots].sort((a, b) => (b.inPersonAvailable ? 1 : 0) - (a.inPersonAvailable ? 1 : 0));
 }
 
 function computeDaySegments(dateStr, responses) {
@@ -150,6 +153,10 @@ const EventResults = ({ eventId, onBack }) => {
   const [event, setEvent] = useState(null);
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { toast, toasts } = useToast();
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+
+  const closeConfirmModal = () => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     if (!eventId) {
@@ -209,18 +216,23 @@ const EventResults = ({ eventId, onBack }) => {
     loadEventAndResponses();
   }, [eventId]);
 
-  const deleteResponse = async (responseId, participantName) => {
-    if (!window.confirm(`${participantName}さんの回答を削除しますか？\n\nこの操作は取り消せません。`)) {
-      return;
-    }
+  const deleteResponse = (responseId, participantName) => {
+    setConfirmModal({
+      isOpen: true,
+      title: '回答を削除しますか？',
+      message: `${participantName}さんの回答を削除します。この操作は取り消せません。`,
+      onConfirm: () => { closeConfirmModal(); execDeleteResponse(responseId); },
+    });
+  };
 
+  const execDeleteResponse = async (responseId) => {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'events', eventId, 'responses', responseId));
       window.location.reload();
     } catch (error) {
       console.error('回答削除エラー:', error);
-      alert('回答の削除に失敗しました');
+      toast.error('回答の削除に失敗しました');
       setLoading(false);
     }
   };
@@ -229,9 +241,9 @@ const EventResults = ({ eventId, onBack }) => {
     if (!event) return;
     const url = `${window.location.origin}?eventId=${event.id}`;
     navigator.clipboard.writeText(url).then(() => {
-      alert('共有リンクをコピーしました！');
+      toast.success('共有リンクをコピーしました');
     }).catch(() => {
-      alert('コピーに失敗しました');
+      toast.error('コピーに失敗しました');
     });
   };
 
@@ -337,6 +349,14 @@ const EventResults = ({ eventId, onBack }) => {
           </div>
         )}
       </div>
+      <ToastContainer toasts={toasts} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={closeConfirmModal}
+      />
     </div>
   );
 };

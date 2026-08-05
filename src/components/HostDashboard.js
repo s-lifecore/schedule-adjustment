@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, query, where, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { useToast, ToastContainer } from './Toast';
+import ConfirmModal from './ConfirmModal';
 
 const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialShowCreateForm = false, onCreateNew }) => {
   const [events, setEvents] = useState([]);
@@ -16,9 +18,17 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
   const [editDescription, setEditDescription] = useState('');
   const [editDates, setEditDates] = useState(['']);
   const [editDefaultInPerson, setEditDefaultInPerson] = useState(false);
-  // 連続日程入力用 state
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
+  const [dateInputMode, setDateInputMode] = useState(null); // null | 'single' | 'range'
+  const [expandedEvents, setExpandedEvents] = useState(new Set());
+  const toggleExpand = (id) => setExpandedEvents(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const { toast, toasts } = useToast();
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [editResponseDeadline, setEditResponseDeadline] = useState('');
 
   useEffect(() => {
@@ -79,7 +89,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       const validDates = candidateDates.filter(date => date.trim() !== '');
       
       if (validDates.length === 0) {
-        alert('候補日を少なくとも1つ入力してください');
+        toast.error('候補日を少なくとも1つ入力してください');
         setLoading(false);
         return;
       }
@@ -103,15 +113,16 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       setCandidateDates(['']);
       setResponseDeadline('');
       setDefaultInPersonAvailable(false);
+      setDateInputMode(null);
       setShowCreateForm(false);
       
       // イベント一覧更新
       await loadUserEventsRefresh();
       
-      alert('イベントが作成されました！');
+      toast.success('イベントを作成しました');
     } catch (error) {
       console.error('イベント作成エラー:', error);
-      alert('イベント作成に失敗しました');
+      toast.error('イベントの作成に失敗しました');
     }
     
     setLoading(false);
@@ -158,30 +169,36 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
     try {
       const shareUrl = `${window.location.origin}?eventId=${eventId}`;
       await navigator.clipboard.writeText(shareUrl);
-      alert(`共有リンクをコピーしました！\n\nイベントID: ${eventId}\n\n参加者にこのリンクまたはイベントIDを共有してください。`);
+      toast.success('共有リンクをコピーしました');
     } catch (error) {
       // クリップボードAPIが使えない場合のフォールバック
       const shareUrl = `${window.location.origin}?eventId=${eventId}`;
       const fallbackText = `イベントID: ${eventId}\n共有リンク: ${shareUrl}`;
-      
-      // テキストエリアを作成してコピー
+
       const textArea = document.createElement('textarea');
       textArea.value = fallbackText;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      
-      alert(`共有情報をコピーしました！\n\nイベントID: ${eventId}\n\n参加者にこの情報を共有してください。`);
+
+      toast.success('共有情報をコピーしました');
     }
   };
 
-  // イベント削除機能
-  const deleteEvent = async (eventId, eventTitle) => {
-    if (!window.confirm(`「${eventTitle}」を削除しますか？\n\nこの操作は取り消せません。参加者の回答もすべて削除されます。`)) {
-      return;
-    }
+  const closeConfirmModal = () => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  // イベント削除機能
+  const deleteEvent = (eventId, eventTitle) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'イベントを削除しますか？',
+      message: `「${eventTitle}」を削除します。この操作は取り消せません。参加者の回答もすべて削除されます。`,
+      onConfirm: () => { closeConfirmModal(); execDeleteEvent(eventId); },
+    });
+  };
+
+  const execDeleteEvent = async (eventId) => {
     setLoading(true);
     try {
       // 1. 回答（responses）を取得して削除
@@ -229,10 +246,10 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       });
       setEvents(eventsData);
       
-      alert('イベントを削除しました');
+      toast.success('イベントを削除しました');
     } catch (error) {
       console.error('イベント削除エラー:', error);
-      alert('イベントの削除に失敗しました');
+      toast.error('イベントの削除に失敗しました');
     }
     setLoading(false);
   };
@@ -289,7 +306,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       const validDates = editDates.filter(date => date.trim() !== '');
       
       if (validDates.length === 0) {
-        alert('候補日を少なくとも1つ入力してください');
+        toast.error('候補日を少なくとも1つ入力してください');
         setLoading(false);
         return;
       }
@@ -332,11 +349,11 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       
       // 編集モード終了
       cancelEdit();
-      alert('イベントを更新しました');
-      
+      toast.success('イベントを更新しました');
+
     } catch (error) {
       console.error('イベント更新エラー:', error);
-      alert('イベントの更新に失敗しました');
+      toast.error('イベントの更新に失敗しました');
     }
     setLoading(false);
   };
@@ -389,92 +406,139 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
             <div className="form-group">
               <label>候補日程</label>
-              {candidateDates.map((date, index) => (
-                <div key={index} className="date-input">
-                  <input
-                    id={`candidate-date-${index}`}
-                    name={`candidateDate${index}`}
-                    type="date"
-                    value={date}
-                    onChange={(e) => updateDate(index, e.target.value)}
-                    required={index === 0}
-                  />
-                  {candidateDates.length > 1 && (
-                    <button 
-                      type="button" 
-                      onClick={() => removeDate(index)}
-                      className="remove-btn"
-                    >
-                      削除
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button 
-                type="button" 
-                onClick={addDateInput}
-                className="add-date-btn"
-              >
-                候補日を追加
-              </button>
 
-              {/* 連続日程入力 */}
-              <div className="date-range-input">
-                <label>連続日程を一括追加</label>
-                <div>
-                  <input
-                    type="date"
-                    value={rangeStart}
-                    onChange={e => setRangeStart(e.target.value)}
-                    placeholder="開始日"
-                  />
-                  <span>〜</span>
-                  <input
-                    type="date"
-                    value={rangeEnd}
-                    onChange={e => setRangeEnd(e.target.value)}
-                    placeholder="終了日"
-                  />
+              {!dateInputMode ? (
+                <>
+                  <div className="date-input-mode-selector">
+                    <button
+                      type="button"
+                      className="mode-btn"
+                      onClick={() => setDateInputMode('single')}
+                    >
+                      ひとつずつ入力する
+                    </button>
+                    <button
+                      type="button"
+                      className="mode-btn"
+                      onClick={() => setDateInputMode('range')}
+                    >
+                      連続日程を追加する
+                    </button>
+                  </div>
+                  <small className="mode-change-hint">
+                    選択後も入力方式はいつでも変更できます。
+                    {candidateDates.some(d => d.trim()) && (
+                      <><br />入力済みの日程は保持されています。</>
+                    )}
+                  </small>
+                </>
+              ) : (
+                <>
+                  {dateInputMode === 'single' ? (
+                    <>
+                      {candidateDates.map((date, index) => (
+                        <div key={index} className="date-input">
+                          <input
+                            id={`candidate-date-${index}`}
+                            name={`candidateDate${index}`}
+                            type="date"
+                            value={date}
+                            onChange={(e) => updateDate(index, e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeDate(index)}
+                            className="remove-btn"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addDateInput}
+                        className="add-date-btn"
+                      >
+                        候補日を追加
+                      </button>
+                    </>
+                  ) : (
+                    <div className="date-range-input">
+                      <div>
+                        <input
+                          type="date"
+                          value={rangeStart}
+                          onChange={e => setRangeStart(e.target.value)}
+                        />
+                        <span>〜</span>
+                        <input
+                          type="date"
+                          value={rangeEnd}
+                          onChange={e => setRangeEnd(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="add-date-btn"
+                          onClick={() => {
+                            if (!rangeStart || !rangeEnd) {
+                              toast.error('開始日と終了日を入力してください');
+                              return;
+                            }
+                            const start = new Date(rangeStart);
+                            const end = new Date(rangeEnd);
+                            if (end < start) {
+                              toast.error('終了日は開始日以降の日付を選択してください');
+                              return;
+                            }
+                            const dates = [];
+                            let d = new Date(start);
+                            while (d <= end) {
+                              const yyyy = d.getFullYear();
+                              const mm = String(d.getMonth()+1).padStart(2,'0');
+                              const dd = String(d.getDate()).padStart(2,'0');
+                              dates.push(`${yyyy}-${mm}-${dd}`);
+                              d.setDate(d.getDate()+1);
+                            }
+                            const existingDates = candidateDates.filter(date => date.trim() !== '');
+                            const newDates = dates.filter(date => !existingDates.includes(date));
+                            if (newDates.length === 0) {
+                              toast.info('指定範囲の日付はすでに候補に含まれています');
+                              return;
+                            }
+                            setCandidateDates([...existingDates, ...newDates]);
+                            setRangeStart('');
+                            setRangeEnd('');
+                          }}
+                        >
+                          追加
+                        </button>
+                      </div>
+                      <small>開始日〜終了日までの全日付を一括追加します</small>
+                      {candidateDates.some(d => d.trim()) && (
+                        <div className="added-dates-preview">
+                          {candidateDates.map((date, i) => date.trim() ? (
+                            <span key={i} className="date-chip">
+                              {date}
+                              <button
+                                type="button"
+                                className="chip-remove"
+                                onClick={() => setCandidateDates(prev => prev.filter((_, idx) => idx !== i))}
+                              >×</button>
+                            </span>
+                          ) : null)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
-                    className="add-date-btn"
-                    onClick={() => {
-                      if (!rangeStart || !rangeEnd) {
-                        alert('開始日と終了日を入力してください');
-                        return;
-                      }
-                      const start = new Date(rangeStart);
-                      const end = new Date(rangeEnd);
-                      if (end < start) {
-                        alert('終了日は開始日以降の日付を選択してください');
-                        return;
-                      }
-                      // 日付範囲を生成
-                      const dates = [];
-                      let d = new Date(start);
-                      while (d <= end) {
-                        const yyyy = d.getFullYear();
-                        const mm = String(d.getMonth()+1).padStart(2,'0');
-                        const dd = String(d.getDate()).padStart(2,'0');
-                        dates.push(`${yyyy}-${mm}-${dd}`);
-                        d.setDate(d.getDate()+1);
-                      }
-                      // 既存候補日と重複しないものだけ追加
-                      const newDates = dates.filter(date => !candidateDates.includes(date));
-                      if (newDates.length === 0) {
-                        alert('指定範囲の日付はすでに候補に含まれています');
-                        return;
-                      }
-                      setCandidateDates([...candidateDates, ...newDates]);
-                      setRangeStart('');
-                      setRangeEnd('');
-                    }}
+                    className="mode-change-btn"
+                    onClick={() => setDateInputMode(null)}
                   >
-                    連続日程を追加
+                    ← 入力方式を変える
                   </button>
-                </div>
-                <small>開始日〜終了日までの全日付を候補日程に一括追加します</small>
-              </div>
+                </>
+              )}
             </div>
 
             <div className="form-group">
@@ -617,44 +681,70 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
               ) : (
                 // 通常表示モード
                 <>
-                  <h4>{event.title}</h4>
-                  {event.description && (
-                    <p className="event-description">{event.description}</p>
-                  )}
-                  <p><strong>イベントID:</strong> {event.id}</p>
-                  <p>候補日: {event.candidateDates.join(', ')}</p>
-                  {event.responseDeadline && (
-                    <p>
-                      <span className={`deadline-badge${new Date() > event.responseDeadline.toDate?.() ? ' over' : ''}`}>
-                        締切 {event.responseDeadline.toDate?.()?.toLocaleString?.() || '不明'}
-                        {new Date() > event.responseDeadline.toDate?.() && '（期限切れ）'}
-                      </span>
-                    </p>
-                  )}
-                  <p>作成日: {event.createdAt?.toDate?.()?.toLocaleDateString?.() || '不明'} ／ 回答数: {event.responseCount || 0}件</p>
-                  <div className="event-actions">
-                    <button onClick={() => viewEventResults(event.id)}>詳細を見る</button>
-                    <button onClick={() => copyShareLink(event.id)}>共有リンクをコピー</button>
-                    <button 
-                      className="edit-btn"
-                      onClick={() => startEdit(event)}
+                  <div className="event-card-summary">
+                    <div className="event-card-main">
+                      <h4>{event.title}</h4>
+                      <p className="event-meta-row">
+                        <span>ID: {event.id}</span>
+                        <span>作成日: {event.createdAt?.toDate?.()?.toLocaleDateString?.() || '不明'}</span>
+                        <span>回答者: {event.responseCount || 0}人</span>
+                      </p>
+                    </div>
+                    <button
+                      className="event-expand-btn"
+                      onClick={() => toggleExpand(event.id)}
                     >
-                      編集
-                    </button>
-                    <button 
-                      className="delete-btn"
-                      onClick={() => deleteEvent(event.id, event.title)}
-                      disabled={loading}
-                    >
-                      削除
+                      {expandedEvents.has(event.id) ? '閉じる' : '詳細を見る'}
                     </button>
                   </div>
+
+                  {expandedEvents.has(event.id) && (
+                    <div className="event-card-detail">
+                      {event.description && (
+                        <p className="event-description">{event.description}</p>
+                      )}
+                      <p>候補日: {event.candidateDates.join(', ')}</p>
+                      {event.responseDeadline && (
+                        <p>
+                          <span className={`deadline-badge${new Date() > event.responseDeadline.toDate?.() ? ' over' : ''}`}>
+                            締切 {event.responseDeadline.toDate?.()?.toLocaleString?.() || '不明'}
+                            {new Date() > event.responseDeadline.toDate?.() && '（期限切れ）'}
+                          </span>
+                        </p>
+                      )}
+                      <div className="event-actions">
+                        <button onClick={() => viewEventResults(event.id)}>結果を見る</button>
+                        <button onClick={() => copyShareLink(event.id)}>共有リンクをコピー</button>
+                        <button
+                          className="edit-btn"
+                          onClick={() => startEdit(event)}
+                        >
+                          編集
+                        </button>
+                        <button
+                          className="delete-btn"
+                          onClick={() => deleteEvent(event.id, event.title)}
+                          disabled={loading}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
           ))
         )}
       </div>
+      <ToastContainer toasts={toasts} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={closeConfirmModal}
+      />
     </div>
   );
 };

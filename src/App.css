@@ -129,8 +129,7 @@ button{
 .create-btn,
 .submit-btn,
 .google-signin-btn,
-.guide-button.primary-button,
-.confirmation-actions .submit-btn{
+.guide-button.primary-button{
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -153,7 +152,6 @@ button{
 .submit-btn:disabled, .create-btn:disabled{ opacity:.4; cursor:not-allowed; }
 
 .cancel-btn,
-.back-to-edit-btn,
 .refresh-btn,
 .guide-button.secondary-button,
 .switch-mode-btn,
@@ -177,7 +175,6 @@ button{
   transition:border-color .15s, background .15s;
 }
 .cancel-btn:hover,
-.back-to-edit-btn:hover,
 .refresh-btn:hover,
 .guide-button.secondary-button:hover,
 .switch-mode-btn:hover,
@@ -332,13 +329,12 @@ button{
    ========================================================================== */
 .card, .event-card, .create-form, .response-form, .event-search,
 .modal-content, .history-item, .response-card,
-.feature-item, .step, .tip-item, .recommendation-box, .overlap-item,
-.confirmation-view{
+.feature-item, .step, .tip-item, .recommendation-box, .overlap-item{
   background:var(--card);
   border:1px solid var(--line);
   border-radius:var(--radius);
-  padding:20px 20px 22px;
-  margin-bottom:16px;
+  padding:20px;
+  margin-bottom:12px;
 }
 
 /* ==========================================================================
@@ -532,17 +528,111 @@ small{
   margin-bottom:8px;
 }
 .date-input input{ flex:1; }
-.date-range-input{ margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
-.date-range-input > label{ display:block; margin-bottom:8px; font-size:13px; color:var(--ink-soft); font-weight:500; }
 .date-range-input > div{ flex-wrap:wrap; }
 .date-range-input > div input{ flex:1; min-width:130px; }
 .date-range-input > div span{ color:var(--ink-soft); }
 
+/* 入力方式セレクター */
+.date-input-mode-selector{
+  display:flex;
+  gap:10px;
+  margin-top:6px;
+}
+.mode-btn{
+  flex:1;
+  padding:14px 10px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--radius);
+  background:var(--card);
+  color:var(--ink);
+  font-size:13.5px;
+  font-family:'Noto Sans JP', sans-serif;
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+  line-height:1.4;
+}
+.mode-btn:hover{ border-color:var(--indigo); background:var(--indigo-soft); color:var(--indigo); }
+.mode-change-btn{
+  margin-top:10px;
+  font-size:12px;
+  color:var(--ink-soft);
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  text-decoration:underline;
+  white-space:nowrap;
+}
+.mode-change-btn:hover{ color:var(--ink); }
+.mode-change-hint{ font-size:12px; color:var(--ink-soft); }
+
+/* 連続日程モードの追加済み日付チップ */
+.added-dates-preview{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+.date-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 8px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  font-size:12px;
+  color:var(--ink-soft);
+  background:var(--bg);
+}
+.chip-remove{
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:var(--ink-soft);
+  font-size:13px;
+  padding:0;
+  line-height:1;
+}
+.chip-remove:hover{ color:var(--danger); }
+
 .events-list{ margin-top:32px; }
 .events-list h3{ margin-bottom:14px; }
-.event-card h4{ margin-bottom:6px; }
+.event-card h4{ margin:0 0 4px; }
 .event-card p{ font-size:13px; margin:0 0 4px; }
 .event-card p strong{ color:var(--ink); font-weight:500; }
+
+.event-card-summary{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.event-card-main{ flex:1; min-width:0; }
+.event-meta-row{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  font-size:12px;
+  color:var(--ink-soft);
+  margin:4px 0 0;
+}
+.event-expand-btn{
+  flex-shrink:0;
+  font-size:12px;
+  color:var(--indigo);
+  background:none;
+  border:1px solid var(--indigo);
+  border-radius:6px;
+  padding:4px 10px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.event-expand-btn:hover{ background:var(--indigo-soft); }
+.event-card-detail{
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid var(--line);
+}
 .event-description{
   background:var(--indigo-soft);
   border-left:3px solid var(--indigo);
@@ -665,7 +755,8 @@ small{
 .in-person-status.available{ background:var(--full-bg); color:var(--full); border:1px solid var(--full-line); }
 .in-person-status.not-available{ background:var(--indigo-soft); color:var(--ink-soft); border:1px solid var(--line); }
 
-.add-time-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.add-time-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.add-time-hint{ color:var(--ink-soft); font-size:12px; width:100%; margin-top:2px; }
 
 .time-input-form{
   background:var(--indigo-soft);
@@ -702,27 +793,6 @@ small{
 .warning{ margin-top:10px; }
 .warning p{ color:var(--danger); font-size:13px; margin:0 0 8px; }
 
-/* confirmation */
-.confirmation-banner{ border-bottom:1px solid var(--line); margin-bottom:16px; padding-bottom:10px; }
-.confirmation-banner h3{ margin:0 0 4px; color:var(--indigo); }
-.confirmation-content{ margin-bottom:20px; }
-.confirm-item{ margin-bottom:14px; display:flex; flex-direction:column; }
-.confirm-item strong{ font-size:12.5px; color:var(--ink-soft); font-weight:500; margin-bottom:4px; }
-.confirm-item > span{ font-size:15px; color:var(--ink); }
-.confirm-slots-list{ background:var(--indigo-soft); padding:12px 14px; border-radius:8px; }
-.confirm-date-group{ margin-bottom:8px; }
-.confirm-date-group:last-child{ margin-bottom:0; }
-.confirm-date{ font-family:'DM Mono', monospace; font-weight:500; display:block; margin-bottom:6px; font-size:13px; }
-.confirm-slots{ display:flex; flex-wrap:wrap; gap:6px; }
-.confirm-slot-badge{
-  background:#fff; border:1px solid var(--line-strong); padding:4px 10px;
-  border-radius:20px; font-size:12px; color:var(--ink); font-family:'DM Mono', monospace;
-}
-.confirm-memo-text{ white-space:pre-wrap; background:var(--indigo-soft); padding:12px 14px; border-radius:8px; color:var(--ink); font-size:13.5px; }
-.no-slots-warning{ color:var(--danger); font-size:13px; }
-.confirmation-actions{ display:flex; gap:10px; }
-.confirmation-actions .back-to-edit-btn{ flex:1; }
-.confirmation-actions .submit-btn{ flex:2; }
 
 /* history */
 .history-mode{ margin-top:6px; }
@@ -866,6 +936,172 @@ small{
   .time-slots{ flex-direction:column; align-items:stretch; }
   .time-inputs{ flex-wrap:wrap; }
   .event-actions button{ flex:1 1 auto; }
-  .confirmation-actions{ flex-direction:column; }
   .history-header{ flex-direction:column; align-items:flex-start; gap:2px; }
+}
+
+/* ==========================================================================
+   Toast notifications
+   ========================================================================== */
+.toast-container{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index:9000;
+  pointer-events:none;
+  max-width:calc(100vw - 32px);
+}
+.toast{
+  padding:11px 18px;
+  border-radius:8px;
+  font-size:14px;
+  font-family:'Noto Sans JP', sans-serif;
+  line-height:1.5;
+  box-shadow:0 2px 12px rgba(0,0,0,.14);
+  animation:toast-in .18s ease;
+  pointer-events:auto;
+}
+@keyframes toast-in{
+  from{ opacity:0; transform:translateY(8px); }
+  to{   opacity:1; transform:translateY(0); }
+}
+.toast-success{ background:var(--full-bg); border:1px solid var(--full-line); color:var(--full); }
+.toast-error{   background:var(--danger-bg); border:1px solid var(--danger); color:var(--danger); }
+.toast-info{    background:var(--indigo-soft); border:1px solid var(--indigo); color:var(--indigo); }
+
+/* ==========================================================================
+   Confirm modal
+   ========================================================================== */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(36,38,43,.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:8000;
+  padding:16px;
+}
+.modal-box{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:28px 24px 20px;
+  max-width:380px;
+  width:100%;
+  box-shadow:0 4px 24px rgba(0,0,0,.12);
+}
+.modal-title{
+  font-family:'Shippori Mincho', serif;
+  font-size:16px;
+  color:var(--ink);
+  margin:0 0 10px;
+}
+.modal-message{
+  font-size:14px;
+  color:var(--ink-soft);
+  margin:0 0 20px;
+  line-height:1.65;
+}
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+.modal-btn{
+  padding:9px 18px;
+  border-radius:7px;
+  font-size:13.5px;
+  font-family:'Noto Sans JP', sans-serif;
+  cursor:pointer;
+  border:1px solid transparent;
+}
+.modal-btn-cancel{
+  background:transparent;
+  border-color:var(--line-strong);
+  color:var(--ink-soft);
+}
+.modal-btn-cancel:hover{ border-color:var(--ink-soft); color:var(--ink); }
+.modal-btn-danger{
+  background:var(--danger);
+  color:#fff;
+  border-color:var(--danger);
+}
+.modal-btn-danger:hover{ opacity:.88; }
+.modal-btn-primary{
+  background:var(--indigo);
+  color:#fff;
+  border-color:var(--indigo);
+}
+.modal-btn-primary:hover{ opacity:.85; }
+
+/* 確認モーダル（回答送信前） */
+.confirm-modal-box{
+  max-width:460px;
+  max-height:80vh;
+  overflow-y:auto;
+}
+.confirm-modal-content{ margin-bottom:20px; }
+.confirm-item{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding:10px 0;
+  border-bottom:1px solid var(--line);
+  font-size:13.5px;
+}
+.confirm-item:last-child{ border-bottom:none; }
+.confirm-item strong{ color:var(--ink-soft); font-size:12px; font-weight:500; }
+.confirm-date-group{ margin-top:4px; }
+.confirm-date{ font-size:12px; color:var(--ink-soft); display:block; margin-bottom:4px; }
+.confirm-slots{ display:flex; flex-wrap:wrap; gap:4px; }
+.confirm-slot-badge{
+  display:inline-block;
+  padding:2px 8px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  font-size:12px;
+  color:var(--ink);
+  background:var(--bg);
+}
+.confirm-memo-text{ white-space:pre-wrap; color:var(--ink); }
+.no-slots-warning{ color:var(--ink-soft); font-size:13px; }
+.confirm-success{
+  text-align:center;
+  padding:16px 0 8px;
+}
+.confirm-success-message{
+  font-size:15px;
+  font-weight:500;
+  color:var(--full);
+  margin:0 0 8px;
+}
+.confirm-success-hint{
+  font-size:12px;
+  color:var(--ink-soft);
+}
+
+/* ==========================================================================
+   Inline notice banner (auto-fill, success state)
+   ========================================================================== */
+.notice-banner{
+  padding:12px 14px;
+  border-radius:8px;
+  font-size:13.5px;
+  line-height:1.6;
+  margin:12px 0;
+}
+.notice-banner.notice-info{
+  background:var(--indigo-soft);
+  border:1px solid var(--indigo);
+  color:var(--indigo);
+}
+.notice-banner.notice-success{
+  background:var(--full-bg);
+  border:1px solid var(--full-line);
+  color:var(--full);
+  text-align:center;
 }

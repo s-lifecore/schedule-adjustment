@@ -139,16 +139,17 @@ function App() {
     };
   }, []);
 
-  // URLパラメータからイベントIDを取得して自動遷移
+  // /event/edit?eventId=xxx の場合のみ client-edit へ遷移（/?eventId=xxx の共有リンクは除外）
   useEffect(() => {
+    const path = window.location.pathname;
+    if (path !== '/event/edit') return;
+
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('eventId');
-    
+
     if (eventId) {
       setSelectedEventId(eventId);
-      // /event/edit に eventId がある場合は、回答入力画面（client-edit）へ遷移
       navigateTo('client-edit', eventId);
-      // URLからパラメータを削除してクリーンに保つ
       window.history.replaceState({}, document.title, '/event/edit');
     }
   }, []);
