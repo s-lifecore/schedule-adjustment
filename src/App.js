@@ -7,6 +7,7 @@ import ClientParticipation from './components/ClientParticipation';
 import EventResults from './components/EventResults';
 import UsageGuide from './components/UsageGuide';
 import UserProfile from './components/UserProfile';
+import ContactForm from './components/ContactForm';
 import './App.css';
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
     if (path === '/event/edit') return 'client-edit';
     if (path === '/results') return 'results';
     if (path === '/usage') return 'usage';
+    if (path === '/contact') return 'contact';
     if (path === '/auth') return 'auth';
     return 'home';
   };  // ルートを変更する関数
@@ -67,6 +69,9 @@ function App() {
         break;
       case 'usage':
         path = '/usage';
+        break;
+      case 'contact':
+        path = '/contact';
         break;
       case 'auth':
         path = '/auth';
@@ -241,9 +246,16 @@ function App() {
         );
       case 'usage':
         return (
-          <UsageGuide 
+          <UsageGuide
             onNavigateToHost={() => navigateTo('host')}
             onNavigateToJoin={() => navigateTo('client-join')}
+          />
+        );
+      case 'contact':
+        return (
+          <ContactForm
+            user={user}
+            onBack={() => navigateTo('home')}
           />
         );
       case 'auth':
@@ -315,6 +327,13 @@ function App() {
               >
                 使い方を見る
                 <small>アプリの機能を説明します</small>
+              </button>
+              <button
+                className="nav-btn contact-btn"
+                onClick={() => navigateTo('contact')}
+              >
+                お問い合わせ
+                <small>機能の要望・バグ報告・ご意見など</small>
               </button>
               {!user && (
                 <button 

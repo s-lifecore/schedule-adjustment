@@ -275,6 +275,34 @@ button{
 .nav-btn.client-btn{ border-left:3px solid var(--full); background:var(--card); }
 .nav-btn.usage-btn{ border-left:3px solid var(--almost); background:var(--card); }
 .nav-btn.login-btn{ border-left:3px solid var(--ink); background:var(--card); }
+.nav-btn.contact-btn{ border-left:3px solid var(--ink-soft); background:var(--card); }
+
+/* ==========================================================================
+   Contact form
+   ========================================================================== */
+.contact-required{ color:var(--danger); font-size:11px; }
+
+.contact-success{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  padding:40px 20px;
+  gap:10px;
+}
+.contact-success-icon{
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  background:var(--full-bg);
+  color:var(--full);
+  font-size:26px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid var(--full-line);
+  margin-bottom:4px;
+}
 
 .user-info{
   background:var(--card);
