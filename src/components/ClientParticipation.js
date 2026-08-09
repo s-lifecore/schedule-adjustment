@@ -957,6 +957,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                           <div className="confirm-slots-list">
                             {Object.entries(timeSlots)
                               .filter(([_, slots]) => slots.length > 0)
+                              .sort(([a], [b]) => new Date(a) - new Date(b))
                               .map(([date, slots]) => (
                                 <div key={date} className="confirm-date-group">
                                   <span className="confirm-date">{date}</span>
@@ -1087,7 +1088,9 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                           <div className="time-slots-summary">
                             <p><strong>選択した時間帯:</strong></p>
                             <ul>
-                              {Object.entries(response.timeSlots).map(([date, slots]) => (
+                              {Object.entries(response.timeSlots)
+                              .sort(([a], [b]) => new Date(a) - new Date(b))
+                              .map(([date, slots]) => (
                                 <li key={date}>
                                   <strong>{date}</strong>
                                   <ul>
