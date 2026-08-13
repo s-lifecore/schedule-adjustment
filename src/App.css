@@ -158,6 +158,7 @@ button{
 .event-actions button:not(.edit-btn):not(.delete-btn),
 .share-btn,
 .view-event-btn,
+.edit-response-btn,
 .login-link-btn,
 .profile-btn{
   display:inline-flex;
@@ -181,6 +182,7 @@ button{
 .event-actions button:hover,
 .share-btn:hover,
 .view-event-btn:hover,
+.edit-response-btn:hover,
 .login-link-btn:hover,
 .profile-btn:hover{ border-color:var(--indigo); color:var(--indigo); }
 
@@ -202,7 +204,7 @@ button{
 }
 .delete-btn:disabled, .delete-response-btn:disabled{ opacity:.4; cursor:not-allowed; }
 
-.edit-btn, .add-date-btn, .add-time-btn, .add-all-day-btn, .confirm-btn,
+.edit-btn, .add-date-btn, .add-time-btn, .add-morning-btn, .add-afternoon-btn, .add-night-btn, .confirm-btn,
 .event-actions .edit-btn{
   display:inline-flex;
   align-items:center;
@@ -216,7 +218,7 @@ button{
   color:var(--indigo);
   cursor:pointer;
 }
-.edit-btn:hover, .add-date-btn:hover, .add-time-btn:hover, .add-all-day-btn:hover, .confirm-btn:hover{
+.edit-btn:hover, .add-date-btn:hover, .add-time-btn:hover, .add-morning-btn:hover, .add-afternoon-btn:hover, .add-night-btn:hover, .confirm-btn:hover{
   background:var(--indigo-soft);
 }
 

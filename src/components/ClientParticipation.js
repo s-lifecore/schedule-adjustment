@@ -16,8 +16,12 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [timeSlotInPersonAvailable, setTimeSlotInPersonAvailable] = useState(false);
-  const [showAllDayFor, setShowAllDayFor] = useState(null);
-  const [allDayInPerson, setAllDayInPerson] = useState(false);
+  const [showMorningFor, setShowMorningFor] = useState(null);
+  const [morningInPerson, setMorningInPerson] = useState(false);
+  const [showAfternoonFor, setShowAfternoonFor] = useState(null);
+  const [afternoonInPerson, setAfternoonInPerson] = useState(false);
+  const [showNightFor, setShowNightFor] = useState(null);
+  const [nightInPerson, setNightInPerson] = useState(false);
   const [currentMode, setCurrentMode] = useState(mode);
   const [existingResponseNotice, setExistingResponseNotice] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(null);
@@ -312,28 +316,69 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     }
   }, [user, currentMode, loadResponseHistory]);
 
+  const clearQuickSlotForms = () => {
+    setShowMorningFor(null);
+    setShowAfternoonFor(null);
+    setShowNightFor(null);
+  };
+
   const addTimeSlot = (date) => {
+    clearQuickSlotForms();
     setShowTimeInputFor(date);
-    setShowAllDayFor(null);
     setStartTime('');
     setEndTime('');
     setTimeSlotInPersonAvailable(event?.defaultInPersonAvailable || false);
   };
 
-  // 全日可ボタン：対面選択フォームを表示
-  const addAllDaySlot = (date) => {
-    setShowAllDayFor(date);
-    setAllDayInPerson(event?.defaultInPersonAvailable || false);
+  const addMorningSlot = (date) => {
     setShowTimeInputFor(null);
+    setShowAfternoonFor(null);
+    setShowNightFor(null);
+    setShowMorningFor(date);
+    setMorningInPerson(event?.defaultInPersonAvailable || false);
   };
 
-  const confirmAllDaySlot = (date) => {
+  const confirmMorningSlot = (date) => {
     setTimeSlots(prev => ({
       ...prev,
-      [date]: sortByInPerson([...prev[date], { timeRange: '09:00-21:00', inPersonAvailable: allDayInPerson }])
+      [date]: sortByInPerson([...prev[date], { timeRange: '09:00-12:00', inPersonAvailable: morningInPerson }])
     }));
-    setShowAllDayFor(null);
-    setAllDayInPerson(false);
+    setShowMorningFor(null);
+    setMorningInPerson(false);
+  };
+
+  const addAfternoonSlot = (date) => {
+    setShowTimeInputFor(null);
+    setShowMorningFor(null);
+    setShowNightFor(null);
+    setShowAfternoonFor(date);
+    setAfternoonInPerson(event?.defaultInPersonAvailable || false);
+  };
+
+  const confirmAfternoonSlot = (date) => {
+    setTimeSlots(prev => ({
+      ...prev,
+      [date]: sortByInPerson([...prev[date], { timeRange: '13:00-17:00', inPersonAvailable: afternoonInPerson }])
+    }));
+    setShowAfternoonFor(null);
+    setAfternoonInPerson(false);
+  };
+
+  const addNightSlot = (date) => {
+    setShowTimeInputFor(null);
+    setShowMorningFor(null);
+    setShowAfternoonFor(null);
+    setShowNightFor(date);
+    setNightInPerson(event?.defaultInPersonAvailable || false);
+  };
+
+  const confirmNightSlot = (date) => {
+    setTimeSlots(prev => ({
+      ...prev,
+      [date]: sortByInPerson([...prev[date], { timeRange: '21:00-24:00', inPersonAvailable: nightInPerson }])
+    }));
+    setShowNightFor(null);
+    setNightInPerson(false);
   };
 
   // 全角数字を半角に変換する関数
@@ -823,34 +868,68 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                   ) : (
                     <>
                       <div className="add-time-actions">
-                        <button
-                          onClick={() => addTimeSlot(date)}
-                          className="add-time-btn"
-                        >
+                        <button onClick={() => addTimeSlot(date)} className="add-time-btn">
                           時間帯を追加
                         </button>
-                        <button
-                          onClick={() => addAllDaySlot(date)}
-                          className="add-all-day-btn"
-                        >
-                          全日可 (09:00-21:00)
+                        <button onClick={() => addMorningSlot(date)} className="add-morning-btn">
+                          午前中 (09:00-12:00)
+                        </button>
+                        <button onClick={() => addAfternoonSlot(date)} className="add-afternoon-btn">
+                          午後 (13:00-17:00)
+                        </button>
+                        <button onClick={() => addNightSlot(date)} className="add-night-btn">
+                          夜間可 (21:00-24:00)
                         </button>
                         <small className="add-time-hint">繰り返し追加して複数の時間帯を設定できます</small>
                       </div>
-                      {showAllDayFor === date && (
+                      {showMorningFor === date && (
                         <div className="time-input-form all-day-confirm-form">
-                          <label htmlFor={`all-day-in-person-${date}`} className="checkbox-label">
+                          <label htmlFor={`morning-in-person-${date}`} className="checkbox-label">
                             <input
-                              id={`all-day-in-person-${date}`}
+                              id={`morning-in-person-${date}`}
                               type="checkbox"
-                              checked={allDayInPerson}
-                              onChange={(e) => setAllDayInPerson(e.target.checked)}
+                              checked={morningInPerson}
+                              onChange={(e) => setMorningInPerson(e.target.checked)}
                             />
                             <span className="checkbox-text">この時間帯は対面参加可能</span>
                           </label>
                           <div className="time-input-buttons">
-                            <button onClick={() => confirmAllDaySlot(date)} className="confirm-btn">確定</button>
-                            <button onClick={() => setShowAllDayFor(null)} className="cancel-btn">キャンセル</button>
+                            <button onClick={() => confirmMorningSlot(date)} className="confirm-btn">確定</button>
+                            <button onClick={() => setShowMorningFor(null)} className="cancel-btn">キャンセル</button>
+                          </div>
+                        </div>
+                      )}
+                      {showAfternoonFor === date && (
+                        <div className="time-input-form all-day-confirm-form">
+                          <label htmlFor={`afternoon-in-person-${date}`} className="checkbox-label">
+                            <input
+                              id={`afternoon-in-person-${date}`}
+                              type="checkbox"
+                              checked={afternoonInPerson}
+                              onChange={(e) => setAfternoonInPerson(e.target.checked)}
+                            />
+                            <span className="checkbox-text">この時間帯は対面参加可能</span>
+                          </label>
+                          <div className="time-input-buttons">
+                            <button onClick={() => confirmAfternoonSlot(date)} className="confirm-btn">確定</button>
+                            <button onClick={() => setShowAfternoonFor(null)} className="cancel-btn">キャンセル</button>
+                          </div>
+                        </div>
+                      )}
+                      {showNightFor === date && (
+                        <div className="time-input-form all-day-confirm-form">
+                          <label htmlFor={`night-in-person-${date}`} className="checkbox-label">
+                            <input
+                              id={`night-in-person-${date}`}
+                              type="checkbox"
+                              checked={nightInPerson}
+                              onChange={(e) => setNightInPerson(e.target.checked)}
+                            />
+                            <span className="checkbox-text">この時間帯は対面参加可能</span>
+                          </label>
+                          <div className="time-input-buttons">
+                            <button onClick={() => confirmNightSlot(date)} className="confirm-btn">確定</button>
+                            <button onClick={() => setShowNightFor(null)} className="cancel-btn">キャンセル</button>
                           </div>
                         </div>
                       )}
@@ -1114,6 +1193,18 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                         )}
                       </div>
                       <div className="history-actions">
+                        {!response.isDeleted && (
+                          <button
+                            className="edit-response-btn"
+                            onClick={() => {
+                              setEventId(response.eventId);
+                              setCurrentMode('join');
+                              setTriggerSearch(true);
+                            }}
+                          >
+                            回答を編集する
+                          </button>
+                        )}
                         <button
                           className="view-event-btn"
                           onClick={() => {
