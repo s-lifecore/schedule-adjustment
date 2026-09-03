@@ -166,12 +166,6 @@ li{margin-bottom:4px;}
   margin-left:auto;
   flex-wrap:wrap;
 }
-.app-nav-user{
-  font-size:12.5px;
-  font-weight:600;
-  color:var(--ink);
-  padding:0 6px;
-}
 .app-nav-backdrop{ display:none; }
 
 /* PC: ロゴ・ナビ・ログイン情報を1行に並べた通常のヘッダーバー */
@@ -233,7 +227,6 @@ li{margin-bottom:4px;}
     flex-direction:column;
     align-items:stretch;
   }
-  .app-nav-user{ padding:12px 10px 4px; }
   .app-nav-auth .app-nav-link{ border-left:3px solid transparent; }
 }
 

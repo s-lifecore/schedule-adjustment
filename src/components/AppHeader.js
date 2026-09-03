@@ -49,9 +49,8 @@ const AppHeader = ({ user, currentView, onNavigate, onShowProfile, onLogout }) =
           <div className="app-nav-auth">
             {user ? (
               <>
-                <span className="app-nav-user">{user.displayName || user.email}</span>
                 <button type="button" className="app-nav-link" onClick={() => { onShowProfile(); setMenuOpen(false); }}>
-                  プロフィール編集
+                  プロフィール編集（{user.displayName || user.email}）
                 </button>
                 <button type="button" className="app-nav-link" onClick={() => { onLogout(); setMenuOpen(false); }}>
                   ログアウト
