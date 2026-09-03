@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, where, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, addDoc, query, where, getDocs, doc, deleteDoc, updateDoc, arrayRemove, deleteField } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToast, ToastContainer } from './Toast';
 import ConfirmModal from './ConfirmModal';
+import AboutSiteInfo from './AboutSiteInfo';
 
 const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialShowCreateForm = false, onCreateNew }) => {
   const [events, setEvents] = useState([]);
@@ -21,50 +22,59 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
   const [dateInputMode, setDateInputMode] = useState(null); // null | 'single' | 'range'
-  const [expandedEvents, setExpandedEvents] = useState(new Set());
-  const toggleExpand = (id) => setExpandedEvents(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  const [detailEvent, setDetailEvent] = useState(null);
   const { toast, toasts } = useToast();
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [editResponseDeadline, setEditResponseDeadline] = useState('');
 
+  // 自分が主催（hostId）または共同ホスト（coHostIds）のイベントを取得
+  const fetchAccessibleEvents = useCallback(async () => {
+    const eventsRef = collection(db, 'events');
+    const [hostSnapshot, coHostSnapshot] = await Promise.all([
+      getDocs(query(eventsRef, where('hostId', '==', user.uid))),
+      getDocs(query(eventsRef, where('coHostIds', 'array-contains', user.uid)))
+    ]);
+
+    const eventDocsById = new Map();
+    hostSnapshot.docs.forEach(d => eventDocsById.set(d.id, d));
+    coHostSnapshot.docs.forEach(d => { if (!eventDocsById.has(d.id)) eventDocsById.set(d.id, d); });
+
+    const eventsData = await Promise.all(
+      Array.from(eventDocsById.values()).map(async (eventDoc) => {
+        const eventData = { id: eventDoc.id, ...eventDoc.data() };
+
+        // responseCountはイベント作成時/回答の作成・削除時に更新している値をそのまま使う。
+        // それ以前に作成された古いイベントだけ、初回表示時に数え直して書き戻す（以降は高速化）。
+        if (eventData.responseCount === undefined) {
+          const responsesRef = collection(db, 'events', eventDoc.id, 'responses');
+          const responsesSnapshot = await getDocs(responsesRef);
+          eventData.responseCount = responsesSnapshot.size;
+          updateDoc(doc(db, 'events', eventDoc.id), { responseCount: eventData.responseCount }).catch(() => {});
+        }
+
+        return eventData;
+      })
+    );
+    // JavaScriptでソート（createdAtで降順）
+    eventsData.sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
+      const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
+      return dateB - dateA;
+    });
+    return eventsData;
+  }, [user]);
+
   useEffect(() => {
     const loadUserEvents = async () => {
       try {
-        const q = query(
-          collection(db, 'events'),
-          where('hostId', '==', user.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const eventsData = await Promise.all(
-          querySnapshot.docs.map(async (doc) => {
-            const eventData = { id: doc.id, ...doc.data() };
-            
-            // 各イベントの回答数を取得
-            const responsesRef = collection(db, 'events', doc.id, 'responses');
-            const responsesSnapshot = await getDocs(responsesRef);
-            eventData.responseCount = responsesSnapshot.size;
-            
-            return eventData;
-          })
-        );
-        // JavaScriptでソート（createdAtで降順）
-        eventsData.sort((a, b) => {
-          const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
-          const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
-          return dateB - dateA;
-        });
-        setEvents(eventsData);
+        setEvents(await fetchAccessibleEvents());
       } catch (error) {
         console.error('イベント取得エラー:', error);
       }
     };
 
     loadUserEvents();
-  }, [user]);
+  }, [fetchAccessibleEvents]);
 
   const addDateInput = () => {
     setCandidateDates([...candidateDates, '']);
@@ -102,6 +112,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
         hostName: user.displayName || user.email,
         defaultInPersonAvailable: defaultInPersonAvailable,
         responseDeadline: responseDeadline ? new Date(responseDeadline) : null,
+        responseCount: 0,
         createdAt: new Date()
       };
 
@@ -130,30 +141,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
   const loadUserEventsRefresh = async () => {
     try {
-      const q = query(
-        collection(db, 'events'),
-        where('hostId', '==', user.uid)
-      );
-      const querySnapshot = await getDocs(q);
-      const eventsData = await Promise.all(
-        querySnapshot.docs.map(async (doc) => {
-          const eventData = { id: doc.id, ...doc.data() };
-          
-          // 各イベントの回答数を取得
-          const responsesRef = collection(db, 'events', doc.id, 'responses');
-          const responsesSnapshot = await getDocs(responsesRef);
-          eventData.responseCount = responsesSnapshot.size;
-          
-          return eventData;
-        })
-      );
-      // JavaScriptでソート（createdAtで降順）
-      eventsData.sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
-        const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
-        return dateB - dateA;
-      });
-      setEvents(eventsData);
+      setEvents(await fetchAccessibleEvents());
     } catch (error) {
       console.error('イベント取得エラー:', error);
     }
@@ -183,6 +171,40 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       document.body.removeChild(textArea);
 
       toast.success('共有情報をコピーしました');
+    }
+  };
+
+  const copyCoHostInviteLink = async (eventId) => {
+    const inviteUrl = `${window.location.origin}/?eventId=${eventId}&cohost=1`;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      toast.success('共同ホスト招待リンクをコピーしました');
+    } catch (error) {
+      const textArea = document.createElement('textarea');
+      textArea.value = inviteUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      toast.success('共同ホスト招待リンクをコピーしました');
+    }
+  };
+
+  const removeCoHost = async (eventId, coHostUid) => {
+    try {
+      await updateDoc(doc(db, 'events', eventId), {
+        coHostIds: arrayRemove(coHostUid),
+        [`coHostNames.${coHostUid}`]: deleteField()
+      });
+      const refreshedEvents = await fetchAccessibleEvents();
+      setEvents(refreshedEvents);
+      setDetailEvent(prev => (prev && prev.id === eventId)
+        ? refreshedEvents.find(e => e.id === eventId) || null
+        : prev);
+      toast.success('共同ホストを削除しました');
+    } catch (error) {
+      console.error('共同ホスト削除エラー:', error);
+      toast.error('共同ホストの削除に失敗しました');
     }
   };
 
@@ -222,32 +244,10 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
       // 2. イベント本体を削除
       await deleteDoc(doc(db, 'events', eventId));
-      
+
       // イベント一覧を再読み込み
-      const q = query(
-        collection(db, 'events'),
-        where('hostId', '==', user.uid)
-      );
-      const querySnapshot = await getDocs(q);
-      const eventsData = await Promise.all(
-        querySnapshot.docs.map(async (doc) => {
-          const eventData = { id: doc.id, ...doc.data() };
-          
-          // 各イベントの回答数を取得
-          const responsesRef = collection(db, 'events', doc.id, 'responses');
-          const responsesSnapshot = await getDocs(responsesRef);
-          eventData.responseCount = responsesSnapshot.size;
-          
-          return eventData;
-        })
-      );
-      eventsData.sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
-        const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
-        return dateB - dateA;
-      });
-      setEvents(eventsData);
-      
+      setEvents(await fetchAccessibleEvents());
+
       toast.success('イベントを削除しました');
     } catch (error) {
       console.error('イベント削除エラー:', error);
@@ -323,32 +323,10 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       };
 
       await updateDoc(doc(db, 'events', editingEvent), updateData);
-      
+
       // イベント一覧を再読み込み
-      const q = query(
-        collection(db, 'events'),
-        where('hostId', '==', user.uid)
-      );
-      const querySnapshot = await getDocs(q);
-      const eventsData = await Promise.all(
-        querySnapshot.docs.map(async (doc) => {
-          const eventData = { id: doc.id, ...doc.data() };
-          
-          // 各イベントの回答数を取得
-          const responsesRef = collection(db, 'events', doc.id, 'responses');
-          const responsesSnapshot = await getDocs(responsesRef);
-          eventData.responseCount = responsesSnapshot.size;
-          
-          return eventData;
-        })
-      );
-      eventsData.sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt) || new Date(0);
-        const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt) || new Date(0);
-        return dateB - dateA;
-      });
-      setEvents(eventsData);
-      
+      setEvents(await fetchAccessibleEvents());
+
       // 編集モード終了
       cancelEdit();
       toast.success('イベントを更新しました');
@@ -380,6 +358,8 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       {showCreateForm && (
         <div className="create-form">
           <h3>新しいイベント作成</h3>
+          <p className="form-hint">以下の内容は、回答画面に自動で表示されます（編集不要）。</p>
+          <AboutSiteInfo />
           <form onSubmit={createEvent}>
             <div className="form-group">
               <label htmlFor="event-title">イベントタイトル</label>
@@ -585,12 +565,16 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       )}
 
       <div className="events-list">
-        <h3>作成したイベント</h3>
+        <h3>管理しているイベント</h3>
         {events.length === 0 ? (
           <p>まだイベントがありません</p>
         ) : (
-          events.map(event => (
-            <div key={event.id} className="event-card">
+          <div className="event-cards-grid">
+          {events.map(event => (
+            <div
+              key={event.id}
+              className={`event-card${editingEvent === event.id ? ' expanded' : ''}`}
+            >
               {editingEvent === event.id ? (
                 // 編集モード
                 <div className="edit-form">
@@ -688,7 +672,12 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                 <>
                   <div className="event-card-summary">
                     <div className="event-card-main">
-                      <h4>{event.title}</h4>
+                      <h4>
+                        {event.title}
+                        {event.hostId !== user.uid && (
+                          <span className="cohost-badge">共同ホスト</span>
+                        )}
+                      </h4>
                       <p className="event-meta-row">
                         <span>ID: {event.id}</span>
                         <span>作成日: {event.createdAt?.toDate?.()?.toLocaleDateString?.() || '不明'}</span>
@@ -697,51 +686,100 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                     </div>
                     <button
                       className="event-expand-btn"
-                      onClick={() => toggleExpand(event.id)}
+                      onClick={() => setDetailEvent(event)}
                     >
-                      {expandedEvents.has(event.id) ? '閉じる' : '詳細を見る'}
+                      詳細を見る
                     </button>
                   </div>
-
-                  {expandedEvents.has(event.id) && (
-                    <div className="event-card-detail">
-                      {event.description && (
-                        <p className="event-description">{event.description}</p>
-                      )}
-                      <p>候補日: {event.candidateDates.join(', ')}</p>
-                      {event.responseDeadline && (
-                        <p>
-                          <span className={`deadline-badge${new Date() > event.responseDeadline.toDate?.() ? ' over' : ''}`}>
-                            締切 {event.responseDeadline.toDate?.()?.toLocaleString?.() || '不明'}
-                            {new Date() > event.responseDeadline.toDate?.() && '（期限切れ）'}
-                          </span>
-                        </p>
-                      )}
-                      <div className="event-actions">
-                        <button onClick={() => viewEventResults(event.id)}>結果を見る</button>
-                        <button onClick={() => copyShareLink(event.id)}>共有リンクをコピー</button>
-                        <button
-                          className="edit-btn"
-                          onClick={() => startEdit(event)}
-                        >
-                          編集
-                        </button>
-                        <button
-                          className="delete-btn"
-                          onClick={() => deleteEvent(event.id, event.title)}
-                          disabled={loading}
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
             </div>
-          ))
+          ))}
+          </div>
         )}
       </div>
+      {detailEvent && (
+        <div className="modal-overlay" onClick={() => setDetailEvent(null)}>
+          <div className="modal-box event-detail-modal-box" onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">
+              {detailEvent.title}
+              {detailEvent.hostId !== user.uid && (
+                <span className="cohost-badge">共同ホスト</span>
+              )}
+            </h3>
+
+            {detailEvent.description && (
+              <p className="event-description">{detailEvent.description}</p>
+            )}
+            <p>候補日: {detailEvent.candidateDates.join(', ')}</p>
+            {detailEvent.responseDeadline && (
+              <p>
+                <span className={`deadline-badge${new Date() > detailEvent.responseDeadline.toDate?.() ? ' over' : ''}`}>
+                  締切 {detailEvent.responseDeadline.toDate?.()?.toLocaleString?.() || '不明'}
+                  {new Date() > detailEvent.responseDeadline.toDate?.() && '（期限切れ）'}
+                </span>
+              </p>
+            )}
+            <div className="event-actions">
+              <button onClick={() => viewEventResults(detailEvent.id)}>結果を見る</button>
+              <button onClick={() => copyShareLink(detailEvent.id)}>共有リンクをコピー</button>
+              <button
+                className="edit-btn"
+                onClick={() => { setDetailEvent(null); startEdit(detailEvent); }}
+              >
+                編集
+              </button>
+              {detailEvent.hostId === user.uid && (
+                <button
+                  className="delete-btn"
+                  onClick={() => { setDetailEvent(null); deleteEvent(detailEvent.id, detailEvent.title); }}
+                  disabled={loading}
+                >
+                  削除
+                </button>
+              )}
+            </div>
+
+            {detailEvent.hostId === user.uid && (
+              <div className="cohost-section">
+                <h5>共同ホスト</h5>
+                {(!detailEvent.coHostIds || detailEvent.coHostIds.length === 0) ? (
+                  <p className="help-text">まだ共同ホストはいません</p>
+                ) : (
+                  <ul className="cohost-list">
+                    {detailEvent.coHostIds.map(uid => (
+                      <li key={uid}>
+                        <span>{detailEvent.coHostNames?.[uid] || uid}</span>
+                        <button
+                          type="button"
+                          className="remove-btn"
+                          onClick={() => removeCoHost(detailEvent.id, uid)}
+                        >
+                          削除
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  className="add-date-btn"
+                  onClick={() => copyCoHostInviteLink(detailEvent.id)}
+                >
+                  共同ホスト招待リンクをコピー
+                </button>
+                <small className="help-text">
+                  リンクを開いてログインした人が共同ホストとして追加されます
+                </small>
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="modal-btn modal-btn-cancel" onClick={() => setDetailEvent(null)}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
       <ToastContainer toasts={toasts} />
       <ConfirmModal
         isOpen={confirmModal.isOpen}

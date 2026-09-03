@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToast, ToastContainer } from './Toast';
 import ConfirmModal from './ConfirmModal';
@@ -229,6 +229,7 @@ const EventResults = ({ eventId, onBack }) => {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'events', eventId, 'responses', responseId));
+      updateDoc(doc(db, 'events', eventId), { responseCount: increment(-1) }).catch(() => {});
       window.location.reload();
     } catch (error) {
       console.error('回答削除エラー:', error);

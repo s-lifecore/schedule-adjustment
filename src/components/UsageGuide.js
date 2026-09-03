@@ -122,6 +122,80 @@ const UsageGuide = ({ onNavigateToHost, onNavigateToJoin }) => {
             </ul>
           </div>
         </section>
+
+        <section className="usage-section">
+          <h2>更新情報</h2>
+          <div className="changelog-list">
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2026-09-04</h4>
+              <ul>
+                <li>共同ホスト機能を追加しました。招待リンクを共有すると、他の人と一緒にイベントを管理できます（日程編集・結果閲覧・回答削除が可能。イベントの削除や共同ホストの管理は作成者のみ行えます）</li>
+                <li>どのページからでも移動できるメニューをヘッダーに追加しました（スマートフォンではメニューボタンから開閉できます）</li>
+                <li>ホストダッシュボードのイベント一覧をカード形式（3列）に変更し、見やすく整理しました</li>
+                <li>イベントの「詳細を見る」をポップアップ表示に変更しました</li>
+                <li>ページの表示速度を全体的に改善しました</li>
+                <li>回答期限が近づくと、入力中の画面にも自動で反映されるようにしました（期限切れ後の送信ミスを防止）</li>
+                <li>自分が作成したイベントの回答画面から、ワンクリックでホスト画面に移動できるボタンを追加しました</li>
+                <li>「本サイトについて」の説明を、イベント内容に関わらず常に表示するようにしました</li>
+                <li>イベント説明・イベント情報の表示を、線で囲んだシンプルなカードデザインに統一しました</li>
+                <li>「任意の時間を追加」ボタンで、自由に時間を指定できることが分かりやすくなりました</li>
+              </ul>
+            </div>
+
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2026-08-13</h4>
+              <ul>
+                <li>時間帯のクイック入力ボタン（午前・午後・夜間など）を拡充しました</li>
+                <li>一度送信した回答を、後から編集できるようにしました</li>
+              </ul>
+            </div>
+
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2026-08-10</h4>
+              <ul>
+                <li>回答履歴・確認画面での候補日が、日付順に並んで表示されるよう修正しました</li>
+              </ul>
+            </div>
+
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2026-08-06</h4>
+              <ul>
+                <li>サイト管理者へのお問い合わせフォームを追加しました</li>
+              </ul>
+            </div>
+
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2026-08-05</h4>
+              <ul>
+                <li>同じ名前の回答者が複数いる場合に、一部参加可の表示名が正しく出ないバグを修正しました</li>
+                <li>スマートフォン・タブレットでも快適に使えるレスポンシブデザインに対応しました</li>
+                <li>通知・確認画面など、入力から送信までの流れを全面的に改善しました</li>
+              </ul>
+            </div>
+
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2026-07-17</h4>
+              <ul>
+                <li>和紙・和文セリフ基調の落ち着いたデザインに全面刷新しました</li>
+              </ul>
+            </div>
+
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2026-07-14</h4>
+              <ul>
+                <li>回答を送信する前に、内容を確認できる確認画面を追加しました</li>
+                <li>共有リンクでのアクセスや、複数行の説明文の表示を改善しました</li>
+              </ul>
+            </div>
+
+            <div className="changelog-entry">
+              <h4 className="changelog-date">2025年8月以前</h4>
+              <ul>
+                <li>参加者名の自動入力、ホストによる日程追加、アンケート機能など基本機能を整備しました</li>
+              </ul>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

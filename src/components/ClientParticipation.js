@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc, deleteDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToast, ToastContainer } from './Toast';
 import ConfirmModal from './ConfirmModal';
+import AboutSiteInfo from './AboutSiteInfo';
 
-const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSharedLinkAccess = false, sharedEventId }) => {
+const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSharedLinkAccess = false, sharedEventId, onGoToHostView }) => {
   const [eventId, setEventId] = useState(sharedEventId || initialEventId || '');
   const [event, setEvent] = useState(null);
   const [participantName, setParticipantName] = useState('');
@@ -31,6 +32,16 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const [expandedResponses, setExpandedResponses] = useState(new Set());
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null });
   const closeConfirmModal = () => setConfirmModal({ isOpen: false, onConfirm: null });
+
+  // 締切超過を入力中にも反映させるため、定期的に現在時刻を更新する
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const isDeadlineExpired = event?.responseDeadline
+    ? now > event.responseDeadline.toDate?.()
+    : false;
   const deleteHistoryItem = async (responseId) => {
     try {
       await deleteDoc(doc(db, 'userResponses', responseId));
@@ -512,6 +523,10 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
 
   // 確認画面へ進む
   const handleToConfirm = () => {
+    if (isDeadlineExpired) {
+      toast.error('回答期限を過ぎているため回答できません');
+      return;
+    }
     if (!participantName.trim()) {
       toast.error('お名前を入力してください');
       return;
@@ -522,7 +537,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   };
 
   const submitResponse = async () => {
-    if (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) {
+    if (isDeadlineExpired) {
       toast.error('回答期限を過ぎているため回答できません');
       return;
     }
@@ -578,6 +593,8 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
         const responsesRef = collection(db, 'events', event.id, 'responses');
         const responseDoc = await addDoc(responsesRef, responseData);
         responseDocId = responseDoc.id;
+        // ダッシュボードでの回答数集計を高速化するため、イベント側にも件数を持たせる
+        updateDoc(doc(db, 'events', event.id), { responseCount: increment(1) }).catch(() => {});
       }
       
       // timeSlotsサブコレクションに時間帯を保存
@@ -653,6 +670,8 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     <button onClick={onBack} className="back-btn">← 戻る</button>
     <h2>日程調整への参加</h2>
     </div>
+
+    <AboutSiteInfo />
 
     {/* イベント説明を表示（イベントが存在し、説明がある場合のみ） */}
     {event && event.description && (
@@ -737,15 +756,24 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
           <div className="event-info">
             <h3>{event.title}</h3>
             <p>ホスト: {event.hostName}</p>
+            {user && onGoToHostView && (event.hostId === user.uid || (event.coHostIds || []).includes(user.uid)) && (
+              <button
+                type="button"
+                onClick={() => onGoToHostView(event.id)}
+                className="go-to-host-btn"
+              >
+                この予定のホスト画面へ
+              </button>
+            )}
             {event.responseDeadline && (
               <div className="deadline-info">
                 <p>
                   <strong>回答期限:</strong> {event.responseDeadline.toDate?.()?.toLocaleString?.() || '不明'}
-                  {new Date() > event.responseDeadline.toDate?.() && (
+                  {isDeadlineExpired && (
                     <span className="deadline-expired"> (期限切れ)</span>
                   )}
                 </p>
-                {new Date() > event.responseDeadline.toDate?.() && (
+                {isDeadlineExpired && (
                   <div className="deadline-expired-message">
                     <p>回答期限を過ぎているため、新規回答・変更はできません。</p>
                   </div>
@@ -869,7 +897,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                     <>
                       <div className="add-time-actions">
                         <button onClick={() => addTimeSlot(date)} className="add-time-btn">
-                          時間帯を追加
+                          任意の時間を追加
                         </button>
                         <button onClick={() => addMorningSlot(date)} className="add-morning-btn">
                           午前中 (09:00-12:00)
@@ -880,7 +908,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                         <button onClick={() => addNightSlot(date)} className="add-night-btn">
                           夜間可 (21:00-24:00)
                         </button>
-                        <small className="add-time-hint">繰り返し追加して複数の時間帯を設定できます</small>
+                        <small className="add-time-hint">「任意の時間を追加」でご自身の都合に合わせて時間を自由に指定できます。繰り返し追加して複数の時間帯を設定できます。</small>
                       </div>
                       {showMorningFor === date && (
                         <div className="time-input-form all-day-confirm-form">
@@ -1003,12 +1031,10 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
 
           <button
             onClick={handleToConfirm}
-            disabled={loading || (event.responseDeadline && new Date() > event.responseDeadline.toDate?.())}
+            disabled={loading || isDeadlineExpired}
             className="submit-btn"
           >
-            {loading ? '処理中...' :
-             (event.responseDeadline && new Date() > event.responseDeadline.toDate?.()) ?
-             '期限切れ' : '確認画面へ'}
+            {loading ? '処理中...' : isDeadlineExpired ? '期限切れ' : '確認画面へ'}
           </button>
 
           {isConfirming && (
@@ -1073,10 +1099,10 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                       </button>
                       <button
                         onClick={submitResponse}
-                        disabled={loading}
+                        disabled={loading || isDeadlineExpired}
                         className="modal-btn modal-btn-primary"
                       >
-                        {loading ? '送信中...' : 'この内容で送信する'}
+                        {loading ? '送信中...' : isDeadlineExpired ? '期限切れ' : 'この内容で送信する'}
                       </button>
                     </div>
                   </>

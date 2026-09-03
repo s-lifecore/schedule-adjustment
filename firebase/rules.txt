@@ -1,0 +1,76 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isEventHostOrCoHost(eventId) {
+      let event = get(/databases/$(database)/documents/events/$(eventId)).data;
+      return isSignedIn() && (
+        event.hostId == request.auth.uid ||
+        request.auth.uid in event.get('coHostIds', [])
+      );
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
+
+      // 主ホストは全項目を編集可能
+      // 共同ホストは日程・説明などのイベント内容のみ編集可能（共同ホストの追加・削除・削除操作は不可）
+      // 共同ホスト招待リンクを開いた本人は、自分のUIDをcoHostIdsに追加する書き込みのみ許可（自己登録）
+      // 回答者（未ログイン含む）は、ダッシュボード表示を高速化するための回答数カウンタ(responseCount)のみ更新可能
+      allow update: if isSignedIn() && (
+        resource.data.hostId == request.auth.uid ||
+        (
+          request.auth.uid in resource.data.get('coHostIds', []) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['title', 'description', 'candidateDates', 'defaultInPersonAvailable', 'responseDeadline', 'updatedAt'])
+        ) ||
+        (
+          request.auth.uid in request.resource.data.get('coHostIds', []) &&
+          request.resource.data.get('coHostIds', []).hasAll(resource.data.get('coHostIds', [])) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coHostIds', 'coHostNames'])
+        )
+      ) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responseCount']);
+
+      allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
+
+      match /responses/{responseId} {
+        allow read: if true;
+        allow create: if request.resource.data.userId == null || (isSignedIn() && request.resource.data.userId == request.auth.uid);
+        allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+        allow delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isEventHostOrCoHost(eventId);
+
+        match /timeSlots/{slotId} {
+          allow read: if true;
+          allow create: if exists(/databases/$(database)/documents/events/$(eventId)/responses/$(responseId))
+            && (get(/databases/$(database)/documents/events/$(eventId)/responses/$(responseId)).data.userId == null
+            || (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)/responses/$(responseId)).data.userId == request.auth.uid));
+          allow update: if isSignedIn() && exists(/databases/$(database)/documents/events/$(eventId)/responses/$(responseId))
+            && get(/databases/$(database)/documents/events/$(eventId)/responses/$(responseId)).data.userId == request.auth.uid;
+          allow delete: if (isSignedIn() && exists(/databases/$(database)/documents/events/$(eventId)/responses/$(responseId))
+            && get(/databases/$(database)/documents/events/$(eventId)/responses/$(responseId)).data.userId == request.auth.uid)
+            || isEventHostOrCoHost(eventId);
+        }
+      }
+    }
+
+    match /userResponses/{userResponseId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isSelf(resource.data.userId);
+    }
+
+    match /users/{userId} {
+      allow create: if isSignedIn() && userId == request.auth.uid;
+      allow read, update: if isSelf(userId);
+    }
+  }
+}

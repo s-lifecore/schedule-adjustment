@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import AuthComponent from './components/AuthComponent';
+import AppHeader from './components/AppHeader';
 import HostDashboard from './components/HostDashboard';
 import ClientParticipation from './components/ClientParticipation';
 import EventResults from './components/EventResults';
 import UsageGuide from './components/UsageGuide';
 import UserProfile from './components/UserProfile';
 import ContactForm from './components/ContactForm';
+import CoHostInvite from './components/CoHostInvite';
 import './App.css';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [currentView, setCurrentView] = useState('home');
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [showUserProfile, setShowUserProfile] = useState(false);
@@ -27,6 +29,9 @@ function App() {
     // URLパラメータにeventIdがある場合は共有リンクアクセスとして処理
     if (eventIdFromUrl && path === '/') {
       setSelectedEventId(eventIdFromUrl);
+      if (urlParams.get('cohost') === '1') {
+        return 'cohost-join';
+      }
       setIsSharedLinkAccess(true);
       return 'client-join';
     }
@@ -111,8 +116,7 @@ function App() {
           }
         }
       }
-      
-      setLoading(false);
+      setAuthChecked(true);
     });
 
     return () => unsubscribe();
@@ -159,14 +163,6 @@ function App() {
     }
   }, []);
 
-  if (loading) {
-    return (
-      <div className="loading">
-        <p>読み込み中...</p>
-      </div>
-    );
-  }
-
   const handleViewResults = (eventId) => {
     setSelectedEventId(eventId);
     navigateTo('results', eventId);
@@ -175,37 +171,39 @@ function App() {
   const renderContent = () => {
     switch (currentView) {
       case 'host':
+        if (!authChecked) return <div className="loading"><p>読み込み中...</p></div>;
         return user ? (
-          <HostDashboard 
-            user={user} 
-            onBack={() => navigateTo('home')} 
+          <HostDashboard
+            user={user}
+            onBack={() => navigateTo('home')}
             onViewResults={handleViewResults}
             onCreateNew={() => navigateTo('host-new')}
           />
         ) : (
-          <AuthComponent 
-            onSuccess={() => navigateTo('host')} 
+          <AuthComponent
+            onSuccess={() => navigateTo('host')}
             purpose="host"
           />
         );
       case 'host-new':
+        if (!authChecked) return <div className="loading"><p>読み込み中...</p></div>;
         return user ? (
-          <HostDashboard 
-            user={user} 
-            onBack={() => navigateTo('host')} 
+          <HostDashboard
+            user={user}
+            onBack={() => navigateTo('host')}
             onViewResults={handleViewResults}
             showCreateForm={true}
           />
         ) : (
-          <AuthComponent 
-            onSuccess={() => navigateTo('host-new')} 
+          <AuthComponent
+            onSuccess={() => navigateTo('host-new')}
             purpose="host"
           />
         );
       case 'client-join':
         return (
-          <ClientParticipation 
-            user={user} 
+          <ClientParticipation
+            user={user}
             onBack={() => {
               setIsSharedLinkAccess(false);
               navigateTo('home');
@@ -213,18 +211,29 @@ function App() {
             mode="join"
             isSharedLinkAccess={isSharedLinkAccess}
             sharedEventId={selectedEventId}
+            onGoToHostView={(eventId) => navigateTo('results', eventId)}
+          />
+        );
+      case 'cohost-join':
+        return (
+          <CoHostInvite
+            user={user}
+            eventId={selectedEventId}
+            onBack={() => navigateTo('home')}
+            onDone={() => navigateTo('host')}
           />
         );
       case 'client-history':
+        if (!authChecked) return <div className="loading"><p>読み込み中...</p></div>;
         return user ? (
-          <ClientParticipation 
-            user={user} 
+          <ClientParticipation
+            user={user}
             onBack={() => navigateTo('home')}
             mode="history"
           />
         ) : (
-          <AuthComponent 
-            onSuccess={() => navigateTo('client-history')} 
+          <AuthComponent
+            onSuccess={() => navigateTo('client-history')}
             purpose="client-history"
           />
         );
@@ -345,43 +354,34 @@ function App() {
                 </button>
               )}
             </div>
-            {user && (
-              <div className="user-info">
-                <p>ログイン中: {user.displayName || user.email}</p>
-                <div className="user-actions">
-                  <button 
-                    onClick={() => setShowUserProfile(true)}
-                    className="profile-btn"
-                  >
-                    プロフィール編集
-                  </button>
-                  <button onClick={() => auth.signOut()}>ログアウト</button>
-                </div>
-              </div>
-            )}
           </div>
         );
     }
   };
 
   return (
-    <div className="App">
-      <header className="app-head">
-        <div className="mark" onClick={() => navigateTo('home')}><span>時間</span>調整</div>
-        <div className="sub">SCHEDULE COORDINATOR</div>
-      </header>
-      {renderContent()}
-      {showUserProfile && user && (
-        <UserProfile
-          user={user}
-          onClose={() => setShowUserProfile(false)}
-          onUpdate={() => {
-            // ユーザー情報を再取得
-            window.location.reload();
-          }}
-        />
-      )}
-    </div>
+    <>
+      <AppHeader
+        user={user}
+        currentView={currentView}
+        onNavigate={navigateTo}
+        onShowProfile={() => setShowUserProfile(true)}
+        onLogout={() => auth.signOut()}
+      />
+      <div className="App">
+        {renderContent()}
+        {showUserProfile && user && (
+          <UserProfile
+            user={user}
+            onClose={() => setShowUserProfile(false)}
+            onUpdate={() => {
+              // ユーザー情報を再取得
+              window.location.reload();
+            }}
+          />
+        )}
+      </div>
+    </>
   );
 }
 
