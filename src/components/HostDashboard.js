@@ -546,14 +546,6 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
         >
           {showCreateForm ? 'キャンセル' : '新しいイベントを作成'}
         </button>
-        {onNavigateToJoin && (
-          <button
-            onClick={() => onNavigateToJoin()}
-            className="go-to-join-btn"
-          >
-            回答入力画面へ
-          </button>
-        )}
       </div>
 
       {showCreateForm && (

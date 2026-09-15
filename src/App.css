@@ -999,16 +999,6 @@ small{
   margin-bottom:4px;
 }
 .go-to-host-btn:hover{ background:var(--indigo-soft); }
-.go-to-join-btn{
-  font-size:12px;
-  color:var(--indigo);
-  background:none;
-  border:1px solid var(--indigo);
-  border-radius:6px;
-  padding:8px 14px;
-  cursor:pointer;
-}
-.go-to-join-btn:hover{ background:var(--indigo-soft); }
 
 .deadline-info{
   background:var(--almost-bg);
