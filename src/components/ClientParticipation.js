@@ -17,12 +17,8 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [timeSlotInPersonAvailable, setTimeSlotInPersonAvailable] = useState(false);
-  const [showMorningFor, setShowMorningFor] = useState(null);
-  const [morningInPerson, setMorningInPerson] = useState(false);
-  const [showAfternoonFor, setShowAfternoonFor] = useState(null);
-  const [afternoonInPerson, setAfternoonInPerson] = useState(false);
-  const [showNightFor, setShowNightFor] = useState(null);
-  const [nightInPerson, setNightInPerson] = useState(false);
+  const [activeQuickSlot, setActiveQuickSlot] = useState(null); // { date, key }
+  const [quickInPerson, setQuickInPerson] = useState(false);
   const [currentMode, setCurrentMode] = useState(mode);
   const [existingResponseNotice, setExistingResponseNotice] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(null);
@@ -60,6 +56,16 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
 
   const sortByInPerson = (slots) =>
     [...slots].sort((a, b) => (b.inPersonAvailable ? 1 : 0) - (a.inPersonAvailable ? 1 : 0));
+
+  // ホストが授業時間帯（コマ）を設定している場合はそれを、していない場合は午前/午後/夜間の既定ボタンを使う
+  const defaultQuickPresets = [
+    { key: 'morning', label: '午前中', timeRange: '09:00-12:00' },
+    { key: 'afternoon', label: '午後', timeRange: '13:00-17:00' },
+    { key: 'night', label: '夜間可', timeRange: '21:00-24:00' },
+  ];
+  const quickPresets = event?.classPeriods?.length > 0
+    ? event.classPeriods.map((p, i) => ({ key: `class-${i}`, label: p.name, timeRange: `${p.start}-${p.end}` }))
+    : defaultQuickPresets;
 
   // イベントIDが入力された際、自動的に「新規参加」タブに切り替える
   useEffect(() => {
@@ -328,9 +334,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   }, [user, currentMode, loadResponseHistory]);
 
   const clearQuickSlotForms = () => {
-    setShowMorningFor(null);
-    setShowAfternoonFor(null);
-    setShowNightFor(null);
+    setActiveQuickSlot(null);
   };
 
   const addTimeSlot = (date) => {
@@ -341,55 +345,19 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     setTimeSlotInPersonAvailable(event?.defaultInPersonAvailable || false);
   };
 
-  const addMorningSlot = (date) => {
+  const addQuickSlot = (date, preset) => {
     setShowTimeInputFor(null);
-    setShowAfternoonFor(null);
-    setShowNightFor(null);
-    setShowMorningFor(date);
-    setMorningInPerson(event?.defaultInPersonAvailable || false);
+    setActiveQuickSlot({ date, key: preset.key });
+    setQuickInPerson(event?.defaultInPersonAvailable || false);
   };
 
-  const confirmMorningSlot = (date) => {
+  const confirmQuickSlot = (date, preset) => {
     setTimeSlots(prev => ({
       ...prev,
-      [date]: sortByInPerson([...prev[date], { timeRange: '09:00-12:00', inPersonAvailable: morningInPerson }])
+      [date]: sortByInPerson([...prev[date], { timeRange: preset.timeRange, inPersonAvailable: quickInPerson }])
     }));
-    setShowMorningFor(null);
-    setMorningInPerson(false);
-  };
-
-  const addAfternoonSlot = (date) => {
-    setShowTimeInputFor(null);
-    setShowMorningFor(null);
-    setShowNightFor(null);
-    setShowAfternoonFor(date);
-    setAfternoonInPerson(event?.defaultInPersonAvailable || false);
-  };
-
-  const confirmAfternoonSlot = (date) => {
-    setTimeSlots(prev => ({
-      ...prev,
-      [date]: sortByInPerson([...prev[date], { timeRange: '13:00-17:00', inPersonAvailable: afternoonInPerson }])
-    }));
-    setShowAfternoonFor(null);
-    setAfternoonInPerson(false);
-  };
-
-  const addNightSlot = (date) => {
-    setShowTimeInputFor(null);
-    setShowMorningFor(null);
-    setShowAfternoonFor(null);
-    setShowNightFor(date);
-    setNightInPerson(event?.defaultInPersonAvailable || false);
-  };
-
-  const confirmNightSlot = (date) => {
-    setTimeSlots(prev => ({
-      ...prev,
-      [date]: sortByInPerson([...prev[date], { timeRange: '21:00-24:00', inPersonAvailable: nightInPerson }])
-    }));
-    setShowNightFor(null);
-    setNightInPerson(false);
+    setActiveQuickSlot(null);
+    setQuickInPerson(false);
   };
 
   // 全角数字を半角に変換する関数
@@ -899,68 +867,36 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                         <button onClick={() => addTimeSlot(date)} className="add-time-btn">
                           任意の時間を追加
                         </button>
-                        <button onClick={() => addMorningSlot(date)} className="add-morning-btn">
-                          午前中 (09:00-12:00)
-                        </button>
-                        <button onClick={() => addAfternoonSlot(date)} className="add-afternoon-btn">
-                          午後 (13:00-17:00)
-                        </button>
-                        <button onClick={() => addNightSlot(date)} className="add-night-btn">
-                          夜間可 (21:00-24:00)
-                        </button>
+                        {quickPresets.map((preset) => (
+                          <button
+                            key={preset.key}
+                            onClick={() => addQuickSlot(date, preset)}
+                            className="add-morning-btn"
+                          >
+                            {preset.label} ({preset.timeRange})
+                          </button>
+                        ))}
                         <small className="add-time-hint">「任意の時間を追加」でご自身の都合に合わせて時間を自由に指定できます。繰り返し追加して複数の時間帯を設定できます。</small>
                       </div>
-                      {showMorningFor === date && (
-                        <div className="time-input-form all-day-confirm-form">
-                          <label htmlFor={`morning-in-person-${date}`} className="checkbox-label">
-                            <input
-                              id={`morning-in-person-${date}`}
-                              type="checkbox"
-                              checked={morningInPerson}
-                              onChange={(e) => setMorningInPerson(e.target.checked)}
-                            />
-                            <span className="checkbox-text">この時間帯は対面参加可能</span>
-                          </label>
-                          <div className="time-input-buttons">
-                            <button onClick={() => confirmMorningSlot(date)} className="confirm-btn">確定</button>
-                            <button onClick={() => setShowMorningFor(null)} className="cancel-btn">キャンセル</button>
+                      {quickPresets.map((preset) => (
+                        activeQuickSlot?.date === date && activeQuickSlot?.key === preset.key && (
+                          <div key={preset.key} className="time-input-form all-day-confirm-form">
+                            <label htmlFor={`quick-in-person-${date}-${preset.key}`} className="checkbox-label">
+                              <input
+                                id={`quick-in-person-${date}-${preset.key}`}
+                                type="checkbox"
+                                checked={quickInPerson}
+                                onChange={(e) => setQuickInPerson(e.target.checked)}
+                              />
+                              <span className="checkbox-text">この時間帯は対面参加可能</span>
+                            </label>
+                            <div className="time-input-buttons">
+                              <button onClick={() => confirmQuickSlot(date, preset)} className="confirm-btn">確定</button>
+                              <button onClick={() => setActiveQuickSlot(null)} className="cancel-btn">キャンセル</button>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {showAfternoonFor === date && (
-                        <div className="time-input-form all-day-confirm-form">
-                          <label htmlFor={`afternoon-in-person-${date}`} className="checkbox-label">
-                            <input
-                              id={`afternoon-in-person-${date}`}
-                              type="checkbox"
-                              checked={afternoonInPerson}
-                              onChange={(e) => setAfternoonInPerson(e.target.checked)}
-                            />
-                            <span className="checkbox-text">この時間帯は対面参加可能</span>
-                          </label>
-                          <div className="time-input-buttons">
-                            <button onClick={() => confirmAfternoonSlot(date)} className="confirm-btn">確定</button>
-                            <button onClick={() => setShowAfternoonFor(null)} className="cancel-btn">キャンセル</button>
-                          </div>
-                        </div>
-                      )}
-                      {showNightFor === date && (
-                        <div className="time-input-form all-day-confirm-form">
-                          <label htmlFor={`night-in-person-${date}`} className="checkbox-label">
-                            <input
-                              id={`night-in-person-${date}`}
-                              type="checkbox"
-                              checked={nightInPerson}
-                              onChange={(e) => setNightInPerson(e.target.checked)}
-                            />
-                            <span className="checkbox-text">この時間帯は対面参加可能</span>
-                          </label>
-                          <div className="time-input-buttons">
-                            <button onClick={() => confirmNightSlot(date)} className="confirm-btn">確定</button>
-                            <button onClick={() => setShowNightFor(null)} className="cancel-btn">キャンセル</button>
-                          </div>
-                        </div>
-                      )}
+                        )
+                      ))}
                     </>
                   )}
                 </div>

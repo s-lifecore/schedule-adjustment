@@ -11,6 +11,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
   const [eventTitle, setEventTitle] = useState('');
   const [eventDescription, setEventDescription] = useState('');
   const [candidateDates, setCandidateDates] = useState(['']);
+  const [classPeriods, setClassPeriods] = useState([]);
   const [responseDeadline, setResponseDeadline] = useState('');
   const [loading, setLoading] = useState(false);
   const [defaultInPersonAvailable, setDefaultInPersonAvailable] = useState(false);
@@ -18,9 +19,11 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editDates, setEditDates] = useState(['']);
+  const [editClassPeriods, setEditClassPeriods] = useState([]);
   const [editDefaultInPerson, setEditDefaultInPerson] = useState(false);
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
+  const [rangeDayFilter, setRangeDayFilter] = useState('all'); // 'all' | 'weekday' | 'weekend'
   const [dateInputMode, setDateInputMode] = useState(null); // null | 'single' | 'range'
   const [detailEvent, setDetailEvent] = useState(null);
   const { toast, toasts } = useToast();
@@ -91,6 +94,21 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
     setCandidateDates(newDates);
   };
 
+  // 授業時間帯（コマ）の操作
+  const addClassPeriod = () => {
+    setClassPeriods([...classPeriods, { name: '', start: '', end: '' }]);
+  };
+
+  const updateClassPeriod = (index, field, value) => {
+    const updated = [...classPeriods];
+    updated[index] = { ...updated[index], [field]: value };
+    setClassPeriods(updated);
+  };
+
+  const removeClassPeriod = (index) => {
+    setClassPeriods(classPeriods.filter((_, i) => i !== index));
+  };
+
   const createEvent = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -104,10 +122,15 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
         return;
       }
 
+      const validClassPeriods = classPeriods
+        .filter(p => p.name.trim() !== '' && p.start && p.end)
+        .map(p => ({ name: p.name.trim(), start: p.start, end: p.end }));
+
       const eventData = {
         title: eventTitle,
         description: eventDescription,
         candidateDates: validDates,
+        classPeriods: validClassPeriods,
         hostId: user.uid,
         hostName: user.displayName || user.email,
         defaultInPersonAvailable: defaultInPersonAvailable,
@@ -117,11 +140,12 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       };
 
       await addDoc(collection(db, 'events'), eventData);
-      
+
       // フォームリセット
       setEventTitle('');
       setEventDescription('');
       setCandidateDates(['']);
+      setClassPeriods([]);
       setResponseDeadline('');
       setDefaultInPersonAvailable(false);
       setDateInputMode(null);
@@ -262,6 +286,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
     setEditTitle(event.title);
     setEditDescription(event.description || '');
     setEditDates(event.candidateDates || ['']);
+    setEditClassPeriods(event.classPeriods || []);
     setEditDefaultInPerson(event.defaultInPersonAvailable || false);
     // 日付型をローカル形式の文字列に変換
     if (event.responseDeadline) {
@@ -279,6 +304,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
     setEditTitle('');
     setEditDescription('');
     setEditDates(['']);
+    setEditClassPeriods([]);
     setEditDefaultInPerson(false);
     setEditResponseDeadline('');
   };
@@ -299,6 +325,21 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
     setEditDates(newDates);
   };
 
+  // 編集用：授業時間帯（コマ）の操作
+  const addEditClassPeriod = () => {
+    setEditClassPeriods([...editClassPeriods, { name: '', start: '', end: '' }]);
+  };
+
+  const updateEditClassPeriod = (index, field, value) => {
+    const updated = [...editClassPeriods];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditClassPeriods(updated);
+  };
+
+  const removeEditClassPeriod = (index) => {
+    setEditClassPeriods(editClassPeriods.filter((_, i) => i !== index));
+  };
+
   // イベント更新
   const updateEvent = async (e) => {
     e.preventDefault();
@@ -313,10 +354,15 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
         return;
       }
 
+      const validEditClassPeriods = editClassPeriods
+        .filter(p => p.name.trim() !== '' && p.start && p.end)
+        .map(p => ({ name: p.name.trim(), start: p.start, end: p.end }));
+
       const updateData = {
         title: editTitle,
         description: editDescription,
         candidateDates: validDates,
+        classPeriods: validEditClassPeriods,
         defaultInPersonAvailable: editDefaultInPerson,
         responseDeadline: editResponseDeadline ? new Date(editResponseDeadline) : null,
         updatedAt: new Date()
@@ -478,16 +524,26 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                             const dates = [];
                             let d = new Date(start);
                             while (d <= end) {
-                              const yyyy = d.getFullYear();
-                              const mm = String(d.getMonth()+1).padStart(2,'0');
-                              const dd = String(d.getDate()).padStart(2,'0');
-                              dates.push(`${yyyy}-${mm}-${dd}`);
+                              const dayOfWeek = d.getDay(); // 0:日, 6:土
+                              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                              const included =
+                                rangeDayFilter === 'all' ||
+                                (rangeDayFilter === 'weekday' && !isWeekend) ||
+                                (rangeDayFilter === 'weekend' && isWeekend);
+                              if (included) {
+                                const yyyy = d.getFullYear();
+                                const mm = String(d.getMonth()+1).padStart(2,'0');
+                                const dd = String(d.getDate()).padStart(2,'0');
+                                dates.push(`${yyyy}-${mm}-${dd}`);
+                              }
                               d.setDate(d.getDate()+1);
                             }
                             const existingDates = candidateDates.filter(date => date.trim() !== '');
                             const newDates = dates.filter(date => !existingDates.includes(date));
                             if (newDates.length === 0) {
-                              toast.info('指定範囲の日付はすでに候補に含まれています');
+                              toast.info(dates.length === 0
+                                ? '指定条件に合う日付がありませんでした'
+                                : '指定範囲の日付はすでに候補に含まれています');
                               return;
                             }
                             setCandidateDates([...existingDates, ...newDates]);
@@ -498,7 +554,39 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                           追加
                         </button>
                       </div>
-                      <small>開始日〜終了日までの全日付を一括追加します</small>
+                      <div className="range-day-filter">
+                        <label>
+                          <input
+                            type="radio"
+                            name="rangeDayFilter"
+                            value="all"
+                            checked={rangeDayFilter === 'all'}
+                            onChange={() => setRangeDayFilter('all')}
+                          />
+                          すべての日
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name="rangeDayFilter"
+                            value="weekday"
+                            checked={rangeDayFilter === 'weekday'}
+                            onChange={() => setRangeDayFilter('weekday')}
+                          />
+                          平日のみ（土日を除く）
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name="rangeDayFilter"
+                            value="weekend"
+                            checked={rangeDayFilter === 'weekend'}
+                            onChange={() => setRangeDayFilter('weekend')}
+                          />
+                          休日のみ（土日）
+                        </label>
+                      </div>
+                      <small>開始日〜終了日までの日付を条件に沿って一括追加します</small>
                       {candidateDates.some(d => d.trim()) && (
                         <div className="added-dates-preview">
                           {candidateDates.map((date, i) => date.trim() ? (
@@ -524,6 +612,45 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                   </button>
                 </>
               )}
+            </div>
+
+            <div className="form-group">
+              <label>授業時間帯（コマ）の設定（任意）</label>
+              <small className="help-text">
+                大学の時間割に合わせて「1限 9:00〜10:30」のようにコマを設定すると、参加者はコマ単位で参加可能時間を選べるようになります（未設定の場合は午前・午後・夜間のボタンが表示されます）。
+              </small>
+              {classPeriods.map((period, index) => (
+                <div key={index} className="class-period-input">
+                  <input
+                    type="text"
+                    value={period.name}
+                    onChange={(e) => updateClassPeriod(index, 'name', e.target.value)}
+                    placeholder="例: 1限"
+                    className="class-period-name"
+                  />
+                  <input
+                    type="time"
+                    value={period.start}
+                    onChange={(e) => updateClassPeriod(index, 'start', e.target.value)}
+                  />
+                  <span>〜</span>
+                  <input
+                    type="time"
+                    value={period.end}
+                    onChange={(e) => updateClassPeriod(index, 'end', e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeClassPeriod(index)}
+                    className="remove-btn"
+                  >
+                    削除
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={addClassPeriod} className="add-date-btn">
+                コマを追加
+              </button>
             </div>
 
             <div className="form-group">
@@ -634,6 +761,45 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                     </div>
 
                     <div className="form-group">
+                      <label>授業時間帯（コマ）の設定（任意）</label>
+                      <small className="help-text">
+                        大学の時間割に合わせてコマを設定すると、参加者はコマ単位で参加可能時間を選べるようになります。
+                      </small>
+                      {editClassPeriods.map((period, index) => (
+                        <div key={index} className="class-period-input">
+                          <input
+                            type="text"
+                            value={period.name}
+                            onChange={(e) => updateEditClassPeriod(index, 'name', e.target.value)}
+                            placeholder="例: 1限"
+                            className="class-period-name"
+                          />
+                          <input
+                            type="time"
+                            value={period.start}
+                            onChange={(e) => updateEditClassPeriod(index, 'start', e.target.value)}
+                          />
+                          <span>〜</span>
+                          <input
+                            type="time"
+                            value={period.end}
+                            onChange={(e) => updateEditClassPeriod(index, 'end', e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeEditClassPeriod(index)}
+                            className="remove-btn"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={addEditClassPeriod} className="add-date-btn">
+                        コマを追加
+                      </button>
+                    </div>
+
+                    <div className="form-group">
                       <label htmlFor={`edit-deadline-${event.id}`}>回答期限（任意）</label>
                       <input
                         id={`edit-deadline-${event.id}`}
@@ -712,6 +878,9 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
               <p className="event-description">{detailEvent.description}</p>
             )}
             <p>候補日: {detailEvent.candidateDates.join(', ')}</p>
+            {detailEvent.classPeriods && detailEvent.classPeriods.length > 0 && (
+              <p>コマ: {detailEvent.classPeriods.map(p => `${p.name}(${p.start}-${p.end})`).join(', ')}</p>
+            )}
             {detailEvent.responseDeadline && (
               <p>
                 <span className={`deadline-badge${new Date() > detailEvent.responseDeadline.toDate?.() ? ' over' : ''}`}>

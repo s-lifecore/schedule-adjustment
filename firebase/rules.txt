@@ -32,7 +32,7 @@ service cloud.firestore {
         (
           request.auth.uid in resource.data.get('coHostIds', []) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['title', 'description', 'candidateDates', 'defaultInPersonAvailable', 'responseDeadline', 'updatedAt'])
+            .hasOnly(['title', 'description', 'candidateDates', 'classPeriods', 'defaultInPersonAvailable', 'responseDeadline', 'updatedAt'])
         ) ||
         (
           request.auth.uid in request.resource.data.get('coHostIds', []) &&
