@@ -709,17 +709,35 @@ small{
 .date-range-input > div span{ color:var(--ink-soft); }
 
 .range-day-filter{
+  margin:8px 0;
+}
+.weekday-preset-buttons{
   display:flex;
   flex-wrap:wrap;
-  gap:14px;
-  margin:8px 0;
+  gap:6px;
+  margin-bottom:8px;
+}
+.weekday-preset-btn{
+  font-size:12px;
+  color:var(--indigo);
+  background:none;
+  border:1px solid var(--indigo);
+  border-radius:14px;
+  padding:4px 10px;
+  cursor:pointer;
+}
+.weekday-preset-btn:hover{ background:var(--indigo-soft); }
+.weekday-checkboxes{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
   font-size:13px;
   color:var(--ink-soft);
 }
-.range-day-filter label{
+.weekday-checkbox-label{
   display:flex;
   align-items:center;
-  gap:5px;
+  gap:4px;
   cursor:pointer;
 }
 

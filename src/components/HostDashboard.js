@@ -17,13 +17,30 @@ const formatDateWithWeekday = (dateStr) => {
   return wd ? `${dateStr}(${wd})` : dateStr;
 };
 
+const WEEKDAY_NAMES = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+const WEEKDAY_SHORT = ['日', '月', '火', '水', '木', '金', '土'];
+const ALL_WEEKDAYS = new Set([0, 1, 2, 3, 4, 5, 6]);
+const WEEKDAY_PRESETS = [
+  { label: 'すべて', days: new Set([0, 1, 2, 3, 4, 5, 6]) },
+  { label: '平日のみ', days: new Set([1, 2, 3, 4, 5]) },
+  { label: '休日のみ（土日）', days: new Set([0, 6]) },
+];
+
 // 候補日の入力（ひとつずつ入力 / 連続日程を平日・休日フィルタ付きで一括追加）
 // 新規作成・編集の両フォームで共通利用する
 const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
   const [mode, setMode] = useState(null); // null | 'single' | 'range'
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
-  const [rangeDayFilter, setRangeDayFilter] = useState('all'); // 'all' | 'weekday' | 'weekend'
+  const [selectedWeekdays, setSelectedWeekdays] = useState(ALL_WEEKDAYS); // 追加対象の曜日（0:日〜6:土）
+
+  const toggleWeekday = (dayIndex) => {
+    setSelectedWeekdays(prev => {
+      const next = new Set(prev);
+      next.has(dayIndex) ? next.delete(dayIndex) : next.add(dayIndex);
+      return next;
+    });
+  };
 
   const updateDate = (index, value) => {
     const newDates = [...dates];
@@ -40,6 +57,10 @@ const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
       toast.error('開始日と終了日を入力してください');
       return;
     }
+    if (selectedWeekdays.size === 0) {
+      toast.error('曜日を1つ以上選択してください');
+      return;
+    }
     const start = new Date(rangeStart);
     const end = new Date(rangeEnd);
     if (end < start) {
@@ -50,12 +71,7 @@ const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
     let d = new Date(start);
     while (d <= end) {
       const dayOfWeek = d.getDay(); // 0:日, 6:土
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      const included =
-        rangeDayFilter === 'all' ||
-        (rangeDayFilter === 'weekday' && !isWeekend) ||
-        (rangeDayFilter === 'weekend' && isWeekend);
-      if (included) {
+      if (selectedWeekdays.has(dayOfWeek)) {
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
@@ -133,38 +149,32 @@ const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
             </button>
           </div>
           <div className="range-day-filter">
-            <label>
-              <input
-                type="radio"
-                name={`${idPrefix}-rangeDayFilter`}
-                value="all"
-                checked={rangeDayFilter === 'all'}
-                onChange={() => setRangeDayFilter('all')}
-              />
-              すべての日
-            </label>
-            <label>
-              <input
-                type="radio"
-                name={`${idPrefix}-rangeDayFilter`}
-                value="weekday"
-                checked={rangeDayFilter === 'weekday'}
-                onChange={() => setRangeDayFilter('weekday')}
-              />
-              平日のみ（土日を除く）
-            </label>
-            <label>
-              <input
-                type="radio"
-                name={`${idPrefix}-rangeDayFilter`}
-                value="weekend"
-                checked={rangeDayFilter === 'weekend'}
-                onChange={() => setRangeDayFilter('weekend')}
-              />
-              休日のみ（土日）
-            </label>
+            <div className="weekday-preset-buttons">
+              {WEEKDAY_PRESETS.map(preset => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="weekday-preset-btn"
+                  onClick={() => setSelectedWeekdays(new Set(preset.days))}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="weekday-checkboxes">
+              {WEEKDAY_SHORT.map((label, dayIndex) => (
+                <label key={dayIndex} className="weekday-checkbox-label" title={WEEKDAY_NAMES[dayIndex]}>
+                  <input
+                    type="checkbox"
+                    checked={selectedWeekdays.has(dayIndex)}
+                    onChange={() => toggleWeekday(dayIndex)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
           </div>
-          <small>開始日〜終了日までの日付を条件に沿って一括追加します</small>
+          <small>開始日〜終了日のうち、選択した曜日の日付だけを一括追加します（例: 月曜日のみ選択すると毎週月曜日を追加）</small>
           {dates.some(d => d.trim()) && (
             <div className="added-dates-preview">
               {dates.map((date, i) => date.trim() ? (
