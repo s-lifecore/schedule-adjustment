@@ -5,6 +5,189 @@ import { useToast, ToastContainer } from './Toast';
 import ConfirmModal from './ConfirmModal';
 import AboutSiteInfo from './AboutSiteInfo';
 
+// YYYY-MM-DD形式の日付文字列から曜日を取得・付与する
+const getWeekdayLabel = (dateStr) => {
+  const m = (dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+};
+const formatDateWithWeekday = (dateStr) => {
+  const wd = getWeekdayLabel(dateStr);
+  return wd ? `${dateStr}(${wd})` : dateStr;
+};
+
+// 候補日の入力（ひとつずつ入力 / 連続日程を平日・休日フィルタ付きで一括追加）
+// 新規作成・編集の両フォームで共通利用する
+const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
+  const [mode, setMode] = useState(null); // null | 'single' | 'range'
+  const [rangeStart, setRangeStart] = useState('');
+  const [rangeEnd, setRangeEnd] = useState('');
+  const [rangeDayFilter, setRangeDayFilter] = useState('all'); // 'all' | 'weekday' | 'weekend'
+
+  const updateDate = (index, value) => {
+    const newDates = [...dates];
+    newDates[index] = value;
+    onChange(newDates);
+  };
+
+  const addDateInput = () => onChange([...dates, '']);
+
+  const removeDate = (index) => onChange(dates.filter((_, i) => i !== index));
+
+  const addRangeDates = () => {
+    if (!rangeStart || !rangeEnd) {
+      toast.error('開始日と終了日を入力してください');
+      return;
+    }
+    const start = new Date(rangeStart);
+    const end = new Date(rangeEnd);
+    if (end < start) {
+      toast.error('終了日は開始日以降の日付を選択してください');
+      return;
+    }
+    const newDatesInRange = [];
+    let d = new Date(start);
+    while (d <= end) {
+      const dayOfWeek = d.getDay(); // 0:日, 6:土
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const included =
+        rangeDayFilter === 'all' ||
+        (rangeDayFilter === 'weekday' && !isWeekend) ||
+        (rangeDayFilter === 'weekend' && isWeekend);
+      if (included) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        newDatesInRange.push(`${yyyy}-${mm}-${dd}`);
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    const existingDates = dates.filter(date => date.trim() !== '');
+    const newDates = newDatesInRange.filter(date => !existingDates.includes(date));
+    if (newDates.length === 0) {
+      toast.info(newDatesInRange.length === 0
+        ? '指定条件に合う日付がありませんでした'
+        : '指定範囲の日付はすでに候補に含まれています');
+      return;
+    }
+    onChange([...existingDates, ...newDates]);
+    setRangeStart('');
+    setRangeEnd('');
+  };
+
+  if (!mode) {
+    return (
+      <>
+        <div className="date-input-mode-selector">
+          <button type="button" className="mode-btn" onClick={() => setMode('single')}>
+            ひとつずつ入力する
+          </button>
+          <button type="button" className="mode-btn" onClick={() => setMode('range')}>
+            連続日程を追加する
+          </button>
+        </div>
+        <small className="mode-change-hint">
+          選択後も入力方式はいつでも変更できます。
+          {dates.some(d => d.trim()) && (
+            <><br />入力済みの日程は保持されています。</>
+          )}
+        </small>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {mode === 'single' ? (
+        <>
+          {dates.map((date, index) => (
+            <div key={index} className="date-input">
+              <input
+                id={`${idPrefix}-date-${index}`}
+                type="date"
+                value={date}
+                min={today}
+                onChange={(e) => updateDate(index, e.target.value)}
+              />
+              {getWeekdayLabel(date) && (
+                <span className="weekday-hint">({getWeekdayLabel(date)})</span>
+              )}
+              <button type="button" onClick={() => removeDate(index)} className="remove-btn">
+                削除
+              </button>
+            </div>
+          ))}
+          <button type="button" onClick={addDateInput} className="add-date-btn">
+            候補日を追加
+          </button>
+        </>
+      ) : (
+        <div className="date-range-input">
+          <div>
+            <input type="date" value={rangeStart} min={today} onChange={e => setRangeStart(e.target.value)} />
+            <span>〜</span>
+            <input type="date" value={rangeEnd} min={today} onChange={e => setRangeEnd(e.target.value)} />
+            <button type="button" className="add-date-btn" onClick={addRangeDates}>
+              追加
+            </button>
+          </div>
+          <div className="range-day-filter">
+            <label>
+              <input
+                type="radio"
+                name={`${idPrefix}-rangeDayFilter`}
+                value="all"
+                checked={rangeDayFilter === 'all'}
+                onChange={() => setRangeDayFilter('all')}
+              />
+              すべての日
+            </label>
+            <label>
+              <input
+                type="radio"
+                name={`${idPrefix}-rangeDayFilter`}
+                value="weekday"
+                checked={rangeDayFilter === 'weekday'}
+                onChange={() => setRangeDayFilter('weekday')}
+              />
+              平日のみ（土日を除く）
+            </label>
+            <label>
+              <input
+                type="radio"
+                name={`${idPrefix}-rangeDayFilter`}
+                value="weekend"
+                checked={rangeDayFilter === 'weekend'}
+                onChange={() => setRangeDayFilter('weekend')}
+              />
+              休日のみ（土日）
+            </label>
+          </div>
+          <small>開始日〜終了日までの日付を条件に沿って一括追加します</small>
+          {dates.some(d => d.trim()) && (
+            <div className="added-dates-preview">
+              {dates.map((date, i) => date.trim() ? (
+                <span key={i} className="date-chip">
+                  {formatDateWithWeekday(date)}
+                  <button
+                    type="button"
+                    className="chip-remove"
+                    onClick={() => onChange(dates.filter((_, idx) => idx !== i))}
+                  >×</button>
+                </span>
+              ) : null)}
+            </div>
+          )}
+        </div>
+      )}
+      <button type="button" className="mode-change-btn" onClick={() => setMode(null)}>
+        ← 入力方式を変える
+      </button>
+    </>
+  );
+};
+
 const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialShowCreateForm = false, onCreateNew, onNavigateToJoin }) => {
   const [events, setEvents] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
@@ -21,10 +204,6 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
   const [editDates, setEditDates] = useState(['']);
   const [editClassPeriods, setEditClassPeriods] = useState([]);
   const [editDefaultInPerson, setEditDefaultInPerson] = useState(false);
-  const [rangeStart, setRangeStart] = useState('');
-  const [rangeEnd, setRangeEnd] = useState('');
-  const [rangeDayFilter, setRangeDayFilter] = useState('all'); // 'all' | 'weekday' | 'weekend'
-  const [dateInputMode, setDateInputMode] = useState(null); // null | 'single' | 'range'
   const [detailEvent, setDetailEvent] = useState(null);
   const { toast, toasts } = useToast();
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
@@ -78,33 +257,6 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
     loadUserEvents();
   }, [fetchAccessibleEvents]);
-
-  const addDateInput = () => {
-    setCandidateDates([...candidateDates, '']);
-  };
-
-  const updateDate = (index, value) => {
-    const newDates = [...candidateDates];
-    newDates[index] = value;
-    setCandidateDates(newDates);
-  };
-
-  const removeDate = (index) => {
-    const newDates = candidateDates.filter((_, i) => i !== index);
-    setCandidateDates(newDates);
-  };
-
-  // YYYY-MM-DD形式の日付文字列から曜日を取得・付与する
-  const getWeekdayLabel = (dateStr) => {
-    const m = (dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return '';
-    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    return ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-  };
-  const formatDateWithWeekday = (dateStr) => {
-    const wd = getWeekdayLabel(dateStr);
-    return wd ? `${dateStr}(${wd})` : dateStr;
-  };
 
   // 授業時間帯（コマ）の操作
   const addClassPeriod = () => {
@@ -160,7 +312,6 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       setClassPeriods([]);
       setResponseDeadline('');
       setDefaultInPersonAvailable(false);
-      setDateInputMode(null);
       setShowCreateForm(false);
       
       // イベント一覧更新
@@ -321,22 +472,6 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
     setEditResponseDeadline('');
   };
 
-  // 編集候補日の操作
-  const addEditDateInput = () => {
-    setEditDates([...editDates, '']);
-  };
-
-  const updateEditDate = (index, value) => {
-    const newDates = [...editDates];
-    newDates[index] = value;
-    setEditDates(newDates);
-  };
-
-  const removeEditDate = (index) => {
-    const newDates = editDates.filter((_, i) => i !== index);
-    setEditDates(newDates);
-  };
-
   // 編集用：授業時間帯（コマ）の操作
   const addEditClassPeriod = () => {
     setEditClassPeriods([...editClassPeriods, { name: '', start: '', end: '' }]);
@@ -454,187 +589,13 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
             <div className="form-group">
               <label>候補日程</label>
-
-              {!dateInputMode ? (
-                <>
-                  <div className="date-input-mode-selector">
-                    <button
-                      type="button"
-                      className="mode-btn"
-                      onClick={() => setDateInputMode('single')}
-                    >
-                      ひとつずつ入力する
-                    </button>
-                    <button
-                      type="button"
-                      className="mode-btn"
-                      onClick={() => setDateInputMode('range')}
-                    >
-                      連続日程を追加する
-                    </button>
-                  </div>
-                  <small className="mode-change-hint">
-                    選択後も入力方式はいつでも変更できます。
-                    {candidateDates.some(d => d.trim()) && (
-                      <><br />入力済みの日程は保持されています。</>
-                    )}
-                  </small>
-                </>
-              ) : (
-                <>
-                  {dateInputMode === 'single' ? (
-                    <>
-                      {candidateDates.map((date, index) => (
-                        <div key={index} className="date-input">
-                          <input
-                            id={`candidate-date-${index}`}
-                            name={`candidateDate${index}`}
-                            type="date"
-                            value={date}
-                            min={today}
-                            onChange={(e) => updateDate(index, e.target.value)}
-                          />
-                          {getWeekdayLabel(date) && (
-                            <span className="weekday-hint">({getWeekdayLabel(date)})</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => removeDate(index)}
-                            className="remove-btn"
-                          >
-                            削除
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={addDateInput}
-                        className="add-date-btn"
-                      >
-                        候補日を追加
-                      </button>
-                    </>
-                  ) : (
-                    <div className="date-range-input">
-                      <div>
-                        <input
-                          type="date"
-                          value={rangeStart}
-                          min={today}
-                          onChange={e => setRangeStart(e.target.value)}
-                        />
-                        <span>〜</span>
-                        <input
-                          type="date"
-                          value={rangeEnd}
-                          min={today}
-                          onChange={e => setRangeEnd(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="add-date-btn"
-                          onClick={() => {
-                            if (!rangeStart || !rangeEnd) {
-                              toast.error('開始日と終了日を入力してください');
-                              return;
-                            }
-                            const start = new Date(rangeStart);
-                            const end = new Date(rangeEnd);
-                            if (end < start) {
-                              toast.error('終了日は開始日以降の日付を選択してください');
-                              return;
-                            }
-                            const dates = [];
-                            let d = new Date(start);
-                            while (d <= end) {
-                              const dayOfWeek = d.getDay(); // 0:日, 6:土
-                              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                              const included =
-                                rangeDayFilter === 'all' ||
-                                (rangeDayFilter === 'weekday' && !isWeekend) ||
-                                (rangeDayFilter === 'weekend' && isWeekend);
-                              if (included) {
-                                const yyyy = d.getFullYear();
-                                const mm = String(d.getMonth()+1).padStart(2,'0');
-                                const dd = String(d.getDate()).padStart(2,'0');
-                                dates.push(`${yyyy}-${mm}-${dd}`);
-                              }
-                              d.setDate(d.getDate()+1);
-                            }
-                            const existingDates = candidateDates.filter(date => date.trim() !== '');
-                            const newDates = dates.filter(date => !existingDates.includes(date));
-                            if (newDates.length === 0) {
-                              toast.info(dates.length === 0
-                                ? '指定条件に合う日付がありませんでした'
-                                : '指定範囲の日付はすでに候補に含まれています');
-                              return;
-                            }
-                            setCandidateDates([...existingDates, ...newDates]);
-                            setRangeStart('');
-                            setRangeEnd('');
-                          }}
-                        >
-                          追加
-                        </button>
-                      </div>
-                      <div className="range-day-filter">
-                        <label>
-                          <input
-                            type="radio"
-                            name="rangeDayFilter"
-                            value="all"
-                            checked={rangeDayFilter === 'all'}
-                            onChange={() => setRangeDayFilter('all')}
-                          />
-                          すべての日
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            name="rangeDayFilter"
-                            value="weekday"
-                            checked={rangeDayFilter === 'weekday'}
-                            onChange={() => setRangeDayFilter('weekday')}
-                          />
-                          平日のみ（土日を除く）
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            name="rangeDayFilter"
-                            value="weekend"
-                            checked={rangeDayFilter === 'weekend'}
-                            onChange={() => setRangeDayFilter('weekend')}
-                          />
-                          休日のみ（土日）
-                        </label>
-                      </div>
-                      <small>開始日〜終了日までの日付を条件に沿って一括追加します</small>
-                      {candidateDates.some(d => d.trim()) && (
-                        <div className="added-dates-preview">
-                          {candidateDates.map((date, i) => date.trim() ? (
-                            <span key={i} className="date-chip">
-                              {formatDateWithWeekday(date)}
-                              <button
-                                type="button"
-                                className="chip-remove"
-                                onClick={() => setCandidateDates(prev => prev.filter((_, idx) => idx !== i))}
-                              >×</button>
-                            </span>
-                          ) : null)}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="mode-change-btn"
-                    onClick={() => setDateInputMode(null)}
-                  >
-                    ← 入力方式を変える
-                  </button>
-                </>
-              )}
+              <CandidateDatesEditor
+                dates={candidateDates}
+                onChange={setCandidateDates}
+                today={today}
+                toast={toast}
+                idPrefix="candidate"
+              />
             </div>
 
             <div className="form-group">
@@ -754,33 +715,13 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
 
                     <div className="form-group">
                       <label>候補日</label>
-                      {editDates.map((date, index) => (
-                        <div key={index} className="date-input">
-                          <input
-                            type="text"
-                            value={date}
-                            onChange={(e) => updateEditDate(index, e.target.value)}
-                            placeholder="例: 2024/01/15"
-                            required
-                          />
-                          {editDates.length > 1 && (
-                            <button 
-                              type="button" 
-                              onClick={() => removeEditDate(index)}
-                              className="remove-date-btn"
-                            >
-                              削除
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      <button 
-                        type="button" 
-                        onClick={addEditDateInput}
-                        className="add-date-btn"
-                      >
-                        候補日を追加
-                      </button>
+                      <CandidateDatesEditor
+                        dates={editDates}
+                        onChange={setEditDates}
+                        today={today}
+                        toast={toast}
+                        idPrefix={`edit-${event.id}`}
+                      />
                     </div>
 
                     <div className="form-group">
