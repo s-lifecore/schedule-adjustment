@@ -704,6 +704,15 @@ small{
 }
 .date-input input{ flex:1; }
 .weekday-hint{ color:var(--ink-soft); font-size:12.5px; white-space:nowrap; }
+.weekday-only-chip{
+  flex:1;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  background:var(--bg);
+  color:var(--ink);
+  font-size:14px;
+}
 .date-range-input > div{ flex-wrap:wrap; }
 .date-range-input > div input{ flex:1; min-width:130px; }
 .date-range-input > div span{ color:var(--ink-soft); }

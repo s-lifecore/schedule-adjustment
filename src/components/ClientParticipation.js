@@ -22,6 +22,19 @@ const formatDateWithWeekday = (dateStr) => {
   return `${dateStr}(${wd})`;
 };
 
+// 候補日の並び替え: YYYY-MM-DD形式の日付は日付順、「月曜日」等の曜日だけの候補はその後に月→日の順で並べる
+const WEEKDAY_NAMES_ORDERED = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+const compareDateOrWeekday = (a, b) => {
+  const keyOf = (dateStr) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return [0, new Date(dateStr).getTime()];
+    const idx = WEEKDAY_NAMES_ORDERED.indexOf(dateStr);
+    return [1, idx === -1 ? 99 : (idx + 6) % 7];
+  };
+  const [groupA, keyA] = keyOf(a);
+  const [groupB, keyB] = keyOf(b);
+  return groupA !== groupB ? groupA - groupB : keyA - keyB;
+};
+
 const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSharedLinkAccess = false, sharedEventId, onGoToHostView }) => {
   const [eventId, setEventId] = useState(sharedEventId || initialEventId || '');
   const [event, setEvent] = useState(null);
@@ -1012,7 +1025,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                           <div className="confirm-slots-list">
                             {Object.entries(timeSlots)
                               .filter(([_, slots]) => slots.length > 0)
-                              .sort(([a], [b]) => new Date(a) - new Date(b))
+                              .sort(([a], [b]) => compareDateOrWeekday(a, b))
                               .map(([date, slots]) => (
                                 <div key={date} className="confirm-date-group">
                                   <span className="confirm-date">{formatDateWithWeekday(date)}</span>
@@ -1144,7 +1157,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                             <p><strong>選択した時間帯:</strong></p>
                             <ul>
                               {Object.entries(response.timeSlots)
-                              .sort(([a], [b]) => new Date(a) - new Date(b))
+                              .sort(([a], [b]) => compareDateOrWeekday(a, b))
                               .map(([date, slots]) => (
                                 <li key={date}>
                                   <strong>{formatDateWithWeekday(date)}</strong>

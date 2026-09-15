@@ -26,16 +26,42 @@ const WEEKDAY_PRESETS = [
   { label: '休日のみ（土日）', days: new Set([0, 6]) },
 ];
 
+// 特定の日付を持たない「曜日だけ」の候補（例: "月曜日"）かどうかを判定する
+const isWeekdayOnlyCandidate = (dateStr) => WEEKDAY_NAMES.includes(dateStr);
+
+// 候補日の並び替え用キー: 日付は日付順、曜日だけの候補はその後に月→日の順で並べる
+const dateSortKey = (dateStr) => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return [0, new Date(dateStr).getTime()];
+  }
+  const idx = WEEKDAY_NAMES.indexOf(dateStr);
+  return [1, idx === -1 ? 99 : (idx + 6) % 7]; // 月=0, 火=1, ..., 日=6の順に並べる
+};
+const compareDateOrWeekday = (a, b) => {
+  const [groupA, keyA] = dateSortKey(a);
+  const [groupB, keyB] = dateSortKey(b);
+  return groupA !== groupB ? groupA - groupB : keyA - keyB;
+};
+
 // 候補日の入力（ひとつずつ入力 / 連続日程を平日・休日フィルタ付きで一括追加）
 // 新規作成・編集の両フォームで共通利用する
 const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
-  const [mode, setMode] = useState(null); // null | 'single' | 'range'
+  const [mode, setMode] = useState(null); // null | 'single' | 'range' | 'weekdayOnly'
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
-  const [selectedWeekdays, setSelectedWeekdays] = useState(ALL_WEEKDAYS); // 追加対象の曜日（0:日〜6:土）
+  const [selectedWeekdays, setSelectedWeekdays] = useState(ALL_WEEKDAYS); // 連続日程モードの絞り込み対象（0:日〜6:土）
+  const [weekdayOnlySelection, setWeekdayOnlySelection] = useState(new Set()); // 曜日だけモードで追加する曜日
 
   const toggleWeekday = (dayIndex) => {
     setSelectedWeekdays(prev => {
+      const next = new Set(prev);
+      next.has(dayIndex) ? next.delete(dayIndex) : next.add(dayIndex);
+      return next;
+    });
+  };
+
+  const toggleWeekdayOnlySelection = (dayIndex) => {
+    setWeekdayOnlySelection(prev => {
       const next = new Set(prev);
       next.has(dayIndex) ? next.delete(dayIndex) : next.add(dayIndex);
       return next;
@@ -87,9 +113,25 @@ const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
         : '指定範囲の日付はすでに候補に含まれています');
       return;
     }
-    onChange([...existingDates, ...newDates]);
+    onChange([...existingDates, ...newDates].sort(compareDateOrWeekday));
     setRangeStart('');
     setRangeEnd('');
+  };
+
+  const addWeekdayOnlyDates = () => {
+    if (weekdayOnlySelection.size === 0) {
+      toast.error('曜日を1つ以上選択してください');
+      return;
+    }
+    const existingDates = dates.filter(date => date.trim() !== '');
+    const toAdd = WEEKDAY_NAMES.filter((_, idx) => weekdayOnlySelection.has(idx))
+      .filter(name => !existingDates.includes(name));
+    if (toAdd.length === 0) {
+      toast.info('選択した曜日はすでに候補に含まれています');
+      return;
+    }
+    onChange([...existingDates, ...toAdd].sort(compareDateOrWeekday));
+    setWeekdayOnlySelection(new Set());
   };
 
   if (!mode) {
@@ -101,6 +143,9 @@ const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
           </button>
           <button type="button" className="mode-btn" onClick={() => setMode('range')}>
             連続日程を追加する
+          </button>
+          <button type="button" className="mode-btn" onClick={() => setMode('weekdayOnly')}>
+            曜日だけを追加する
           </button>
         </div>
         <small className="mode-change-hint">
@@ -119,15 +164,21 @@ const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
         <>
           {dates.map((date, index) => (
             <div key={index} className="date-input">
-              <input
-                id={`${idPrefix}-date-${index}`}
-                type="date"
-                value={date}
-                min={today}
-                onChange={(e) => updateDate(index, e.target.value)}
-              />
-              {getWeekdayLabel(date) && (
-                <span className="weekday-hint">({getWeekdayLabel(date)})</span>
+              {isWeekdayOnlyCandidate(date) ? (
+                <span className="weekday-only-chip">{date}</span>
+              ) : (
+                <>
+                  <input
+                    id={`${idPrefix}-date-${index}`}
+                    type="date"
+                    value={date}
+                    min={today}
+                    onChange={(e) => updateDate(index, e.target.value)}
+                  />
+                  {getWeekdayLabel(date) && (
+                    <span className="weekday-hint">({getWeekdayLabel(date)})</span>
+                  )}
+                </>
               )}
               <button type="button" onClick={() => removeDate(index)} className="remove-btn">
                 削除
@@ -138,6 +189,39 @@ const CandidateDatesEditor = ({ dates, onChange, today, toast, idPrefix }) => {
             候補日を追加
           </button>
         </>
+      ) : mode === 'weekdayOnly' ? (
+        <div className="date-range-input">
+          <small>特定の日付を決めず、「毎週月曜日」のように曜日だけを候補として追加します。</small>
+          <div className="weekday-checkboxes">
+            {WEEKDAY_SHORT.map((label, dayIndex) => (
+              <label key={dayIndex} className="weekday-checkbox-label" title={WEEKDAY_NAMES[dayIndex]}>
+                <input
+                  type="checkbox"
+                  checked={weekdayOnlySelection.has(dayIndex)}
+                  onChange={() => toggleWeekdayOnlySelection(dayIndex)}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          <button type="button" className="add-date-btn" onClick={addWeekdayOnlyDates}>
+            選択した曜日を追加
+          </button>
+          {dates.some(isWeekdayOnlyCandidate) && (
+            <div className="added-dates-preview">
+              {dates.map((date, i) => isWeekdayOnlyCandidate(date) ? (
+                <span key={i} className="date-chip">
+                  {date}
+                  <button
+                    type="button"
+                    className="chip-remove"
+                    onClick={() => onChange(dates.filter((_, idx) => idx !== i))}
+                  >×</button>
+                </span>
+              ) : null)}
+            </div>
+          )}
+        </div>
       ) : (
         <div className="date-range-input">
           <div>
