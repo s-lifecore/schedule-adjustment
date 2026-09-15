@@ -87,12 +87,8 @@ function App() {
     
     window.history.pushState({}, '', path);
     setCurrentView(route);
-    if (eventId) setSelectedEventId(eventId);
-    
-    // イベントIDが指定されている場合、参加画面では自動的に「新規参加」タブを表示させるためのヒント
-    if (eventId && (route === 'client-join' || route === 'client-edit')) {
-      // 必要に応じて追加の処理をここに記述可能
-    }
+    // eventIdを渡さなかった場合は、前の画面で選択されていたイベントIDを持ち越さないようクリアする
+    setSelectedEventId(eventId);
   };
 
   useEffect(() => {
@@ -178,6 +174,7 @@ function App() {
             onBack={() => navigateTo('home')}
             onViewResults={handleViewResults}
             onCreateNew={() => navigateTo('host-new')}
+            onNavigateToJoin={(eventId) => navigateTo('client-join', eventId)}
           />
         ) : (
           <AuthComponent
@@ -193,6 +190,7 @@ function App() {
             onBack={() => navigateTo('host')}
             onViewResults={handleViewResults}
             showCreateForm={true}
+            onNavigateToJoin={(eventId) => navigateTo('client-join', eventId)}
           />
         ) : (
           <AuthComponent
@@ -211,6 +209,7 @@ function App() {
             mode="join"
             isSharedLinkAccess={isSharedLinkAccess}
             sharedEventId={selectedEventId}
+            initialEventId={!isSharedLinkAccess ? selectedEventId : null}
             onGoToHostView={(eventId) => navigateTo('results', eventId)}
           />
         );

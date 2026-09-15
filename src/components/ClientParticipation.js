@@ -5,6 +5,23 @@ import { useToast, ToastContainer } from './Toast';
 import ConfirmModal from './ConfirmModal';
 import AboutSiteInfo from './AboutSiteInfo';
 
+const timeRangeStartMinutes = (timeRange) => {
+  const m = (timeRange || '').split('-')[0]?.trim().match(/^(\d{1,2}):(\d{2})$/);
+  return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : Number.MAX_SAFE_INTEGER;
+};
+
+const sortSlotsByTime = (slots) =>
+  [...slots].sort((a, b) => timeRangeStartMinutes(a.timeRange) - timeRangeStartMinutes(b.timeRange));
+
+// YYYY-MM-DD形式の日付文字列に曜日を付与して表示する（例: 2026-09-20(日)）
+const formatDateWithWeekday = (dateStr) => {
+  const m = (dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return dateStr;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const wd = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+  return `${dateStr}(${wd})`;
+};
+
 const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSharedLinkAccess = false, sharedEventId, onGoToHostView }) => {
   const [eventId, setEventId] = useState(sharedEventId || initialEventId || '');
   const [event, setEvent] = useState(null);
@@ -53,9 +70,6 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
-
-  const sortByInPerson = (slots) =>
-    [...slots].sort((a, b) => (b.inPersonAvailable ? 1 : 0) - (a.inPersonAvailable ? 1 : 0));
 
   // ホストが授業時間帯（コマ）を設定している場合はそれを、していない場合は午前/午後/夜間の既定ボタンを使う
   const defaultQuickPresets = [
@@ -177,7 +191,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
               timeSlotsSnapshot.docs.forEach(doc => {
                 const slotData = doc.data();
                 if (slotData.date && slotData.timeSlots) {
-                  existingTimeSlots[slotData.date] = sortByInPerson(slotData.timeSlots);
+                  existingTimeSlots[slotData.date] = sortSlotsByTime(slotData.timeSlots);
                 }
               });
               
@@ -354,7 +368,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
   const confirmQuickSlot = (date, preset) => {
     setTimeSlots(prev => ({
       ...prev,
-      [date]: sortByInPerson([...prev[date], { timeRange: preset.timeRange, inPersonAvailable: quickInPerson }])
+      [date]: sortSlotsByTime([...prev[date], { timeRange: preset.timeRange, inPersonAvailable: quickInPerson }])
     }));
     setActiveQuickSlot(null);
     setQuickInPerson(false);
@@ -465,7 +479,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
 
     setTimeSlots(prev => ({
       ...prev,
-      [date]: sortByInPerson([...prev[date], timeSlotObj])
+      [date]: sortSlotsByTime([...prev[date], timeSlotObj])
     }));
     
     // 入力フォームを閉じる
@@ -775,7 +789,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
             </p>
             {event.candidateDates.map(date => (
               <div key={date} className="date-section">
-                <h5>{date} <small className="optional-text">（任意）</small></h5>
+                <h5>{formatDateWithWeekday(date)} <small className="optional-text">（任意）</small></h5>
                 <div className="time-slots">
                   {timeSlots[date]?.map((slot, index) => (
                     <div key={index} className="time-slot">
@@ -1001,7 +1015,7 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                               .sort(([a], [b]) => new Date(a) - new Date(b))
                               .map(([date, slots]) => (
                                 <div key={date} className="confirm-date-group">
-                                  <span className="confirm-date">{date}</span>
+                                  <span className="confirm-date">{formatDateWithWeekday(date)}</span>
                                   <div className="confirm-slots">
                                     {slots.map((slot, idx) => (
                                       <span key={idx} className="confirm-slot-badge">
@@ -1133,9 +1147,9 @@ const ClientParticipation = ({ user, onBack, initialEventId, mode = 'join', isSh
                               .sort(([a], [b]) => new Date(a) - new Date(b))
                               .map(([date, slots]) => (
                                 <li key={date}>
-                                  <strong>{date}</strong>
+                                  <strong>{formatDateWithWeekday(date)}</strong>
                                   <ul>
-                                    {slots.map((slot, index) => (
+                                    {sortSlotsByTime(slots).map((slot, index) => (
                                       <li key={index}>
                                         {slot.timeRange}
                                         {slot.inPersonAvailable && ' (対面可能)'}

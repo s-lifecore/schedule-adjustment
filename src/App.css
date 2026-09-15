@@ -703,6 +703,7 @@ small{
   margin-bottom:8px;
 }
 .date-input input{ flex:1; }
+.weekday-hint{ color:var(--ink-soft); font-size:12.5px; white-space:nowrap; }
 .date-range-input > div{ flex-wrap:wrap; }
 .date-range-input > div input{ flex:1; min-width:130px; }
 .date-range-input > div span{ color:var(--ink-soft); }
@@ -998,6 +999,16 @@ small{
   margin-bottom:4px;
 }
 .go-to-host-btn:hover{ background:var(--indigo-soft); }
+.go-to-join-btn{
+  font-size:12px;
+  color:var(--indigo);
+  background:none;
+  border:1px solid var(--indigo);
+  border-radius:6px;
+  padding:8px 14px;
+  cursor:pointer;
+}
+.go-to-join-btn:hover{ background:var(--indigo-soft); }
 
 .deadline-info{
   background:var(--almost-bg);

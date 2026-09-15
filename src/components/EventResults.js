@@ -40,7 +40,11 @@ function formatDateLabel(dateStr) {
 function getDateSlots(response, dateStr) {
   const entry = (response.timeSlots || []).find(ts => ts.date === dateStr);
   const slots = (entry && entry.timeSlots) || [];
-  return [...slots].sort((a, b) => (b.inPersonAvailable ? 1 : 0) - (a.inPersonAvailable ? 1 : 0));
+  return [...slots].sort((a, b) => {
+    const rangeA = parseTimeRangeToMinutes(a.timeRange);
+    const rangeB = parseTimeRangeToMinutes(b.timeRange);
+    return (rangeA ? rangeA[0] : Infinity) - (rangeB ? rangeB[0] : Infinity);
+  });
 }
 
 function computeDaySegments(dateStr, responses) {

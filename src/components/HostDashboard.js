@@ -5,7 +5,7 @@ import { useToast, ToastContainer } from './Toast';
 import ConfirmModal from './ConfirmModal';
 import AboutSiteInfo from './AboutSiteInfo';
 
-const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialShowCreateForm = false, onCreateNew }) => {
+const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialShowCreateForm = false, onCreateNew, onNavigateToJoin }) => {
   const [events, setEvents] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
   const [eventTitle, setEventTitle] = useState('');
@@ -92,6 +92,18 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
   const removeDate = (index) => {
     const newDates = candidateDates.filter((_, i) => i !== index);
     setCandidateDates(newDates);
+  };
+
+  // YYYY-MM-DD形式の日付文字列から曜日を取得・付与する
+  const getWeekdayLabel = (dateStr) => {
+    const m = (dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+  };
+  const formatDateWithWeekday = (dateStr) => {
+    const wd = getWeekdayLabel(dateStr);
+    return wd ? `${dateStr}(${wd})` : dateStr;
   };
 
   // 授業時間帯（コマ）の操作
@@ -393,12 +405,20 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
       </div>
 
       <div className="actions">
-        <button 
+        <button
           onClick={() => setShowCreateForm(!showCreateForm)}
           className="create-btn"
         >
           {showCreateForm ? 'キャンセル' : '新しいイベントを作成'}
         </button>
+        {onNavigateToJoin && (
+          <button
+            onClick={() => onNavigateToJoin()}
+            className="go-to-join-btn"
+          >
+            回答入力画面へ
+          </button>
+        )}
       </div>
 
       {showCreateForm && (
@@ -474,6 +494,9 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                             min={today}
                             onChange={(e) => updateDate(index, e.target.value)}
                           />
+                          {getWeekdayLabel(date) && (
+                            <span className="weekday-hint">({getWeekdayLabel(date)})</span>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeDate(index)}
@@ -591,7 +614,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
                         <div className="added-dates-preview">
                           {candidateDates.map((date, i) => date.trim() ? (
                             <span key={i} className="date-chip">
-                              {date}
+                              {formatDateWithWeekday(date)}
                               <button
                                 type="button"
                                 className="chip-remove"
@@ -877,7 +900,7 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
             {detailEvent.description && (
               <p className="event-description">{detailEvent.description}</p>
             )}
-            <p>候補日: {detailEvent.candidateDates.join(', ')}</p>
+            <p>候補日: {detailEvent.candidateDates.map(formatDateWithWeekday).join(', ')}</p>
             {detailEvent.classPeriods && detailEvent.classPeriods.length > 0 && (
               <p>コマ: {detailEvent.classPeriods.map(p => `${p.name}(${p.start}-${p.end})`).join(', ')}</p>
             )}
@@ -891,6 +914,9 @@ const HostDashboard = ({ user, onBack, onViewResults, showCreateForm: initialSho
             )}
             <div className="event-actions">
               <button onClick={() => viewEventResults(detailEvent.id)}>結果を見る</button>
+              {onNavigateToJoin && (
+                <button onClick={() => onNavigateToJoin(detailEvent.id)}>回答画面を開く</button>
+              )}
               <button onClick={() => copyShareLink(detailEvent.id)}>共有リンクをコピー</button>
               <button
                 className="edit-btn"
