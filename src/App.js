@@ -6,6 +6,7 @@ import AppHeader from './components/AppHeader';
 import HostDashboard from './components/HostDashboard';
 import ClientParticipation from './components/ClientParticipation';
 import EventResults from './components/EventResults';
+import ScheduleCalendarView from './components/ScheduleCalendarView';
 import UsageGuide from './components/UsageGuide';
 import UserProfile from './components/UserProfile';
 import ContactForm from './components/ContactForm';
@@ -42,10 +43,22 @@ function App() {
     if (path === '/event/join') return 'client-join';
     if (path === '/event/history') return 'client-history';
     if (path === '/event/edit') return 'client-edit';
-    if (path === '/results') return 'results';
     if (path === '/usage') return 'usage';
     if (path === '/contact') return 'contact';
     if (path === '/auth') return 'auth';
+
+    // /{eventId}/results と /{eventId}/results/schedule はイベントIDをパスに含む
+    const scheduleMatch = path.match(/^\/([^/]+)\/results\/schedule\/?$/);
+    if (scheduleMatch) {
+      setSelectedEventId(scheduleMatch[1]);
+      return 'results-schedule';
+    }
+    const resultsMatch = path.match(/^\/([^/]+)\/results\/?$/);
+    if (resultsMatch) {
+      setSelectedEventId(resultsMatch[1]);
+      return 'results';
+    }
+
     return 'home';
   };  // ルートを変更する関数
   const navigateTo = (route, eventId = null) => {
@@ -70,7 +83,10 @@ function App() {
         path = '/event/edit';
         break;
       case 'results':
-        path = '/results';
+        path = eventId ? `/${eventId}/results` : '/results';
+        break;
+      case 'results-schedule':
+        path = eventId ? `/${eventId}/results/schedule` : '/results/schedule';
         break;
       case 'usage':
         path = '/usage';
@@ -247,9 +263,20 @@ function App() {
         );
       case 'results':
         return (
-          <EventResults 
+          <EventResults
             eventId={selectedEventId}
-            onBack={() => navigateTo('host')}
+            onBack={() => navigateTo(user ? 'host' : 'home')}
+            onViewSchedule={(id) => navigateTo('results-schedule', id)}
+            user={user}
+          />
+        );
+      case 'results-schedule':
+        return (
+          <ScheduleCalendarView
+            eventId={selectedEventId}
+            onBack={() => navigateTo(user ? 'host' : 'home')}
+            onViewList={(id) => navigateTo('results', id)}
+            user={user}
           />
         );
       case 'usage':

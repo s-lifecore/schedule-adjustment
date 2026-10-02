@@ -1,51 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useToast, ToastContainer } from './Toast';
 import ConfirmModal from './ConfirmModal';
+import ResponseDetailModal from './ResponseDetailModal';
+import { useEventResponses } from '../hooks/useEventResponses';
+import { parseTimeRangeToMinutes, minToLabel, formatDateLabel, getDateSlots } from '../utils/scheduleFormat';
+import { generateSchedulePassword } from '../utils/generatePassword';
 
 const SLOT_MIN = 15;
 const SLOTS_PER_DAY = 1440 / SLOT_MIN;
-
-function parseTimeRangeToMinutes(range) {
-  const parts = (range || '').split('-');
-  if (parts.length !== 2) return null;
-  const toMin = (t) => {
-    const m = t.trim().match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return null;
-    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  };
-  const s = toMin(parts[0]);
-  const e = toMin(parts[1]);
-  if (s === null || e === null) return null;
-  return [s, e];
-}
-
-function minToLabel(min) {
-  min = Math.max(0, Math.min(1440, min));
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
-}
-
-function formatDateLabel(dateStr) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    const d = new Date(dateStr + 'T00:00:00');
-    const wd = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-    return `${d.getMonth() + 1}/${d.getDate()}(${wd})`;
-  }
-  return dateStr;
-}
-
-function getDateSlots(response, dateStr) {
-  const entry = (response.timeSlots || []).find(ts => ts.date === dateStr);
-  const slots = (entry && entry.timeSlots) || [];
-  return [...slots].sort((a, b) => {
-    const rangeA = parseTimeRangeToMinutes(a.timeRange);
-    const rangeB = parseTimeRangeToMinutes(b.timeRange);
-    return (rangeA ? rangeA[0] : Infinity) - (rangeB ? rangeB[0] : Infinity);
-  });
-}
 
 function computeDaySegments(dateStr, responses) {
   const total = responses.length;
@@ -153,73 +117,67 @@ const DayBlock = ({ date, responses }) => {
   );
 };
 
-const EventResults = ({ eventId, onBack }) => {
-  const [event, setEvent] = useState(null);
-  const [responses, setResponses] = useState([]);
-  const [loading, setLoading] = useState(true);
+const EventResults = ({ eventId, onBack, onViewSchedule, user }) => {
+  const { event, responses, loading, setEvent, setResponses } = useEventResponses(eventId);
   const { toast, toasts } = useToast();
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [detailResponse, setDetailResponse] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const closeConfirmModal = () => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  const isHostOrCoHost = !!(user && event && (
+    event.hostId === user.uid || (event.coHostIds || []).includes(user.uid)
+  ));
+
+  // 共有カレンダーの閲覧パスワードが未発行のイベントには、ホストが管理画面を開いたタイミングで自動発行する
   useEffect(() => {
-    if (!eventId) {
-      setLoading(false);
-      return;
+    if (!event || !eventId || event.schedulePassword || !isHostOrCoHost) return;
+    const password = generateSchedulePassword();
+    updateDoc(doc(db, 'events', eventId), { schedulePassword: password })
+      .then(() => setEvent(prev => prev ? { ...prev, schedulePassword: password } : prev))
+      .catch(() => {});
+  }, [event, eventId, isHostOrCoHost, setEvent]);
+
+  const scheduleShareUrl = event ? `${window.location.origin}/${event.id}/results/schedule` : '';
+
+  const copyScheduleShareUrl = () => {
+    navigator.clipboard.writeText(scheduleShareUrl).then(() => {
+      toast.success('共有URLをコピーしました');
+    }).catch(() => {
+      toast.error('コピーに失敗しました');
+    });
+  };
+
+  const copySchedulePassword = () => {
+    if (!event?.schedulePassword) return;
+    navigator.clipboard.writeText(event.schedulePassword).then(() => {
+      toast.success('パスワードをコピーしました');
+    }).catch(() => {
+      toast.error('コピーに失敗しました');
+    });
+  };
+
+  const regenerateSchedulePassword = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'パスワードを再発行しますか？',
+      message: 'すでに共有リンクを伝えている人は、新しいパスワードを知らないとカレンダーを閲覧できなくなります。',
+      onConfirm: () => { closeConfirmModal(); execRegenerateSchedulePassword(); },
+    });
+  };
+
+  const execRegenerateSchedulePassword = async () => {
+    const password = generateSchedulePassword();
+    try {
+      await updateDoc(doc(db, 'events', eventId), { schedulePassword: password });
+      setEvent(prev => prev ? { ...prev, schedulePassword: password } : prev);
+      toast.success('パスワードを再発行しました');
+    } catch (error) {
+      console.error('パスワード再発行エラー:', error);
+      toast.error('パスワードの再発行に失敗しました');
     }
-
-    const loadEventAndResponses = async () => {
-      setLoading(true);
-      try {
-        const eventDoc = await getDoc(doc(db, 'events', eventId));
-        if (!eventDoc.exists()) {
-          console.error('イベントが見つかりません');
-          setLoading(false);
-          return;
-        }
-
-        const eventData = { id: eventDoc.id, ...eventDoc.data() };
-        setEvent(eventData);
-
-        const responsesRef = collection(db, 'events', eventId, 'responses');
-        const snapshot = await getDocs(responsesRef);
-
-        const responsesData = await Promise.all(
-          snapshot.docs.map(async (responseDoc) => {
-            const responseData = { id: responseDoc.id, ...responseDoc.data() };
-
-            const timeSlotsRef = collection(db, 'events', eventId, 'responses', responseDoc.id, 'timeSlots');
-            const timeSlotsSnapshot = await getDocs(timeSlotsRef);
-
-            responseData.timeSlots = timeSlotsSnapshot.docs.map(timeSlotDoc => ({
-              id: timeSlotDoc.id,
-              ...timeSlotDoc.data()
-            })) || [];
-
-            if (responseData.timeSlots.length === 0 && responseData.times) {
-              responseData.timeSlots = responseData.times || [];
-            }
-
-            return responseData;
-          })
-        );
-
-        responsesData.sort((a, b) => {
-          const aTime = a.submittedAt?.toDate?.() || new Date(0);
-          const bTime = b.submittedAt?.toDate?.() || new Date(0);
-          return bTime - aTime;
-        });
-
-        setResponses(responsesData);
-      } catch (error) {
-        console.error('イベント・回答取得エラー:', error);
-      }
-      setLoading(false);
-    };
-
-    loadEventAndResponses();
-  }, [eventId]);
+  };
 
   const deleteResponse = (responseId, participantName) => {
     setConfirmModal({
@@ -231,16 +189,16 @@ const EventResults = ({ eventId, onBack }) => {
   };
 
   const execDeleteResponse = async (responseId) => {
-    setLoading(true);
+    setDeleting(true);
     try {
       await deleteDoc(doc(db, 'events', eventId, 'responses', responseId));
       updateDoc(doc(db, 'events', eventId), { responseCount: increment(-1) }).catch(() => {});
-      window.location.reload();
+      setResponses(prev => prev.filter(r => r.id !== responseId));
     } catch (error) {
       console.error('回答削除エラー:', error);
       toast.error('回答の削除に失敗しました');
-      setLoading(false);
     }
+    setDeleting(false);
   };
 
   const copyEventLink = () => {
@@ -277,6 +235,41 @@ const EventResults = ({ eventId, onBack }) => {
         <button onClick={onBack} className="back-btn">← 戻る</button>
         <h2>{event.title}</h2>
       </div>
+
+      {onViewSchedule && (
+        <div className="mode-tabs">
+          <button className="tab-btn active">一覧表示</button>
+          <button className="tab-btn" onClick={() => onViewSchedule(event.id)}>カレンダー表示</button>
+        </div>
+      )}
+
+      {onViewSchedule && (
+        <div className="card schedule-share-card">
+          <h3>カレンダー表示の共有</h3>
+          <p className="share-hint">このURLとパスワードを知っている人は、ログインなしでカレンダー表示を閲覧できます。</p>
+          <div className="share-field">
+            <label>共有URL</label>
+            <div className="share-field-row">
+              <code className="share-value">{scheduleShareUrl}</code>
+              <button onClick={copyScheduleShareUrl} className="share-btn">コピー</button>
+            </div>
+          </div>
+          <div className="share-field">
+            <label>パスワード</label>
+            <div className="share-field-row">
+              <code className="share-value">{event.schedulePassword || '発行中...'}</code>
+              <button onClick={copySchedulePassword} className="share-btn" disabled={!event.schedulePassword}>コピー</button>
+            </div>
+          </div>
+          <button
+            onClick={regenerateSchedulePassword}
+            className="regenerate-password-btn"
+            disabled={!event.schedulePassword}
+          >
+            パスワードを再発行する
+          </button>
+        </div>
+      )}
 
       <div className="event-info">
         <p><strong>候補日:</strong> {event.candidateDates.join(', ')}</p>
@@ -352,7 +345,7 @@ const EventResults = ({ eventId, onBack }) => {
                     <button
                       className="delete-response-btn"
                       onClick={() => deleteResponse(response.id, response.name)}
-                      disabled={loading}
+                      disabled={deleting}
                     >
                       削除
                     </button>
@@ -366,46 +359,7 @@ const EventResults = ({ eventId, onBack }) => {
           </div>
         )}
       </div>
-      {detailResponse && (
-        <div className="modal-overlay" onClick={() => setDetailResponse(null)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">{detailResponse.name}さんの回答</h3>
-            <p className="modal-message p-detail-submitted-at">
-              {detailResponse.submittedAt?.toDate?.()?.toLocaleString?.() || ''}
-            </p>
-            <div className="p-detail">
-              {event.candidateDates.map(date => {
-                const slots = getDateSlots(detailResponse, date);
-                return (
-                  <div key={date} className="confirm-date-group">
-                    <span className="confirm-date">{formatDateLabel(date)}</span>
-                    {slots.length === 0 ? (
-                      <span className="no-slots-warning">回答なし</span>
-                    ) : (
-                      <div className="confirm-slots">
-                        {slots.map((slot, idx) => (
-                          <span key={idx} className="confirm-slot-badge">
-                            {slot.timeRange}{slot.inPersonAvailable ? '（対面可）' : ''}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {detailResponse.memo && (
-              <div className="confirm-item p-detail-memo">
-                <strong>備考</strong>
-                <div className="confirm-memo-text">{detailResponse.memo}</div>
-              </div>
-            )}
-            <div className="modal-actions">
-              <button className="modal-btn modal-btn-cancel" onClick={() => setDetailResponse(null)}>閉じる</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ResponseDetailModal event={event} response={detailResponse} onClose={() => setDetailResponse(null)} />
       <ToastContainer toasts={toasts} />
       <ConfirmModal
         isOpen={confirmModal.isOpen}

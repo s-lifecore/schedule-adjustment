@@ -169,7 +169,7 @@ li{margin-bottom:4px;}
 .app-nav-backdrop{ display:none; }
 
 /* PC: ロゴ・ナビ・ログイン情報を1行に並べた通常のヘッダーバー */
-@media (min-width:601px){
+@media (min-width:701px){
   .app-head{
     display:flex;
     align-items:center;
@@ -180,7 +180,7 @@ li{margin-bottom:4px;}
   .app-nav{ flex:1; min-width:0; margin-top:0; }
 }
 
-@media (max-width:600px){
+@media (max-width:700px){
   .menu-toggle-btn{ display:flex; }
   .app-head .sub{ display:none; }
   .app-nav{
@@ -298,7 +298,8 @@ button{
 .view-event-btn,
 .edit-response-btn,
 .login-link-btn,
-.profile-btn{
+.profile-btn,
+.regenerate-password-btn{
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -322,7 +323,9 @@ button{
 .view-event-btn:hover,
 .edit-response-btn:hover,
 .login-link-btn:hover,
-.profile-btn:hover{ border-color:var(--indigo); color:var(--indigo); }
+.profile-btn:hover,
+.regenerate-password-btn:hover{ border-color:var(--indigo); color:var(--indigo); }
+.regenerate-password-btn:disabled{ opacity:.4; cursor:not-allowed; }
 
 .remove-btn, .remove-date-btn, .delete-btn, .delete-response-btn,
 .event-actions .delete-btn{
@@ -1242,6 +1245,174 @@ small{
 }
 .p-detail-submitted-at{ font-size:12px; color:var(--ink-soft); margin-top:-6px; }
 .p-detail-memo{ border-top:1px solid var(--line); margin-top:4px; padding-top:10px; }
+
+/* ==========================================================================
+   Event results — calendar view
+   ========================================================================== */
+.event-results.schedule-calendar-view{ max-width:960px; }
+
+.calendar-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:16px;
+}
+.calendar-legend-item{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:4px 10px 4px 8px;
+  font-size:12px;
+  color:var(--ink);
+  cursor:pointer;
+  font-family:'Noto Sans JP', sans-serif;
+}
+.calendar-legend-item:hover{ background:var(--indigo-soft); }
+.calendar-legend-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  flex-shrink:0;
+  display:inline-block;
+}
+
+.calendar-grid-wrap{
+  overflow-x:auto;
+  border:1px solid var(--line);
+  border-radius:8px;
+}
+.calendar-grid{
+  display:grid;
+  grid-template-rows:auto 1fr;
+}
+.calendar-corner,
+.calendar-col-header{
+  border-bottom:1px solid var(--line);
+  background:var(--card);
+}
+.calendar-corner{
+  position:sticky;
+  left:0;
+  z-index:2;
+}
+.calendar-col-header{
+  padding:8px 4px;
+  text-align:center;
+  font-family:'DM Mono', monospace;
+  font-size:12.5px;
+  font-weight:500;
+  color:var(--ink);
+  border-left:1px solid var(--line);
+}
+.calendar-time-axis{
+  position:sticky;
+  left:0;
+  z-index:2;
+  background:var(--card);
+}
+.calendar-hour-row{
+  position:relative;
+  border-top:1px solid var(--line);
+  box-sizing:border-box;
+}
+.calendar-hour-label{
+  position:absolute;
+  top:0;
+  right:6px;
+  transform:translateY(-50%);
+  font-family:'DM Mono', monospace;
+  font-size:10px;
+  color:var(--ink-soft);
+  background:var(--card);
+  padding:0 2px;
+}
+.calendar-day-col{
+  position:relative;
+  border-left:1px solid var(--line);
+  box-sizing:border-box;
+}
+.calendar-hour-gridline{
+  position:absolute;
+  left:0;
+  right:0;
+  height:0;
+  border-top:1px solid var(--line);
+}
+.calendar-day-empty{
+  position:absolute;
+  top:50%;
+  left:0;
+  right:0;
+  transform:translateY(-50%);
+  text-align:center;
+  font-size:12px;
+  color:var(--ink-soft);
+}
+.calendar-event-block{
+  position:absolute;
+  box-sizing:border-box;
+  border:none;
+  border-radius:5px;
+  box-shadow:0 0 0 1.5px var(--card);
+  color:#fff;
+  padding:2px 6px;
+  text-align:left;
+  cursor:pointer;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  line-height:1.25;
+  font-family:'Noto Sans JP', sans-serif;
+}
+.calendar-event-name{ font-size:11px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calendar-event-time{ font-size:10px; opacity:0.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+@media (max-width:640px){
+  .calendar-col-header{ font-size:11px; padding:6px 2px; }
+  .calendar-hour-label{ font-size:9px; }
+  .calendar-event-name, .calendar-event-time{ font-size:9.5px; }
+}
+
+/* ==========================================================================
+   Schedule share & password gate
+   ========================================================================== */
+.schedule-share-card h3{ margin:0 0 6px; font-size:15px; }
+.share-hint{ font-size:12.5px; color:var(--ink-soft); margin:0 0 14px; }
+.share-field{ margin-bottom:12px; }
+.share-field:last-of-type{ margin-bottom:14px; }
+.share-field label{
+  display:block;
+  font-size:12px;
+  color:var(--ink-soft);
+  margin-bottom:5px;
+  font-weight:500;
+}
+.share-field-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.share-value{
+  flex:1;
+  min-width:0;
+  font-family:'DM Mono', monospace;
+  font-size:13px;
+  background:var(--indigo-soft);
+  border-radius:6px;
+  padding:7px 10px;
+  overflow-wrap:break-word;
+  word-break:break-all;
+}
+
+.password-gate-card h3{ margin:0 0 6px; font-size:15px; }
+.password-gate-hint{ font-size:13px; color:var(--ink-soft); margin:0 0 16px; }
+.password-gate-form .form-group{ margin-bottom:10px; }
+.password-gate-form input{ text-transform:uppercase; letter-spacing:1px; }
+.password-gate-error{ color:var(--danger); font-size:13px; margin:0 0 12px; }
 
 /* ==========================================================================
    Usage guide
