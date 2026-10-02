@@ -159,6 +159,7 @@ const EventResults = ({ eventId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const { toast, toasts } = useToast();
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [detailResponse, setDetailResponse] = useState(null);
 
   const closeConfirmModal = () => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
 
@@ -343,6 +344,12 @@ const EventResults = ({ eventId, onBack }) => {
                     </div>
                     <span className="p-time">{summary}</span>
                     <button
+                      className="event-expand-btn"
+                      onClick={() => setDetailResponse(response)}
+                    >
+                      詳細を見る
+                    </button>
+                    <button
                       className="delete-response-btn"
                       onClick={() => deleteResponse(response.id, response.name)}
                       disabled={loading}
@@ -359,6 +366,46 @@ const EventResults = ({ eventId, onBack }) => {
           </div>
         )}
       </div>
+      {detailResponse && (
+        <div className="modal-overlay" onClick={() => setDetailResponse(null)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">{detailResponse.name}さんの回答</h3>
+            <p className="modal-message p-detail-submitted-at">
+              {detailResponse.submittedAt?.toDate?.()?.toLocaleString?.() || ''}
+            </p>
+            <div className="p-detail">
+              {event.candidateDates.map(date => {
+                const slots = getDateSlots(detailResponse, date);
+                return (
+                  <div key={date} className="confirm-date-group">
+                    <span className="confirm-date">{formatDateLabel(date)}</span>
+                    {slots.length === 0 ? (
+                      <span className="no-slots-warning">回答なし</span>
+                    ) : (
+                      <div className="confirm-slots">
+                        {slots.map((slot, idx) => (
+                          <span key={idx} className="confirm-slot-badge">
+                            {slot.timeRange}{slot.inPersonAvailable ? '（対面可）' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {detailResponse.memo && (
+              <div className="confirm-item p-detail-memo">
+                <strong>備考</strong>
+                <div className="confirm-memo-text">{detailResponse.memo}</div>
+              </div>
+            )}
+            <div className="modal-actions">
+              <button className="modal-btn modal-btn-cancel" onClick={() => setDetailResponse(null)}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
       <ToastContainer toasts={toasts} />
       <ConfirmModal
         isOpen={confirmModal.isOpen}
